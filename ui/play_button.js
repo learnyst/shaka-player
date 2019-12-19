@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -36,6 +24,8 @@ shaka.ui.PlayButton = class extends shaka.ui.Element {
   constructor(parent, controls) {
     super(parent, controls);
 
+    const AdManager = shaka.ads.AdManager;
+
     /** @protected {!HTMLElement} */
     this.button = shaka.util.Dom.createHTMLElement('button');
     this.parent.appendChild(this.button);
@@ -52,17 +42,34 @@ shaka.ui.PlayButton = class extends shaka.ui.Element {
 
     this.eventManager.listen(this.video, 'play', () => {
       this.updateAriaLabel();
+      this.updateIcon();
     });
 
     this.eventManager.listen(this.video, 'pause', () => {
       this.updateAriaLabel();
+      this.updateIcon();
+    });
+
+    this.eventManager.listen(this.adManager, AdManager.AD_PAUSED, () => {
+      this.updateAriaLabel();
+      this.updateIcon();
+    });
+
+    this.eventManager.listen(this.adManager, AdManager.AD_RESUMED, () => {
+      this.updateAriaLabel();
+      this.updateIcon();
+    });
+
+    this.eventManager.listen(this.adManager, AdManager.AD_STARTED, () => {
+      this.updateAriaLabel();
+      this.updateIcon();
     });
 
     this.eventManager.listen(this.button, 'click', () => {
-      if (this.isPaused()) {
-        this.video.play();
+      if (this.ad) {
+        this.controls.playPauseAd();
       } else {
-        this.video.pause();
+        this.controls.playPausePresentation();
       }
     });
   }
@@ -72,9 +79,11 @@ shaka.ui.PlayButton = class extends shaka.ui.Element {
    * @protected
    */
   isPaused() {
-    // The video element is in a paused state while seeking, but we don't count
-    // that.
-    return this.video.paused && !this.controls.isSeeking();
+    if (this.ad) {
+      return this.ad.isPaused();
+    }
+
+    return this.controls.presentationIsPaused();
   }
 
   /** @protected */
@@ -85,4 +94,10 @@ shaka.ui.PlayButton = class extends shaka.ui.Element {
     this.button.setAttribute(shaka.ui.Constants.ARIA_LABEL,
         this.localization.resolve(label));
   }
+
+  /**
+   * Called when the button's icon needs to change.
+   * To be overridden by subclasses.
+   */
+  updateIcon() {}
 };

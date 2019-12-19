@@ -1,23 +1,12 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
 goog.provide('shaka.ui.VolumeBar');
 
+goog.require('goog.asserts');
 goog.require('shaka.ui.Constants');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
@@ -38,9 +27,24 @@ shaka.ui.VolumeBar = class extends shaka.ui.RangeElement {
     super(parent, controls,
         ['shaka-volume-bar-container'], ['shaka-volume-bar']);
 
+    /** @private {!shaka.extern.UIConfiguration} */
+    this.config_ = this.controls.getConfig();
+
     this.eventManager.listen(this.video,
         'volumechange',
-        () => this.onVolumeStateChange_());
+        () => this.onPresentationVolumeChange_());
+
+    this.eventManager.listen(this.adManager,
+        shaka.ads.AdManager.AD_VOLUME_CHANGED,
+        () => this.onAdVolumeChange_());
+
+    this.eventManager.listen(this.adManager,
+        shaka.ads.AdManager.AD_MUTED,
+        () => this.onAdVolumeChange_());
+
+    this.eventManager.listen(this.adManager,
+        shaka.ads.AdManager.AD_STOPPED,
+        () => this.onPresentationVolumeChange_());
 
     this.eventManager.listen(this.localization,
         shaka.ui.Localization.LOCALE_UPDATED,
@@ -51,7 +55,7 @@ shaka.ui.VolumeBar = class extends shaka.ui.RangeElement {
         () => this.updateAriaLabel_());
 
     // Initialize volume display and label.
-    this.onVolumeStateChange_();
+    this.onPresentationVolumeChange_();
     this.updateAriaLabel_();
   }
 
@@ -62,28 +66,46 @@ shaka.ui.VolumeBar = class extends shaka.ui.RangeElement {
    * @override
    */
   onChange() {
-    this.video.volume = this.getValue();
-    if (this.video.volume == 0) {
-      this.video.muted = true;
+    if (this.ad) {
+      this.ad.setVolume(this.getValue());
     } else {
-      this.video.muted = false;
+      this.video.volume = this.getValue();
+      if (this.video.volume == 0) {
+        this.video.muted = true;
+      } else {
+        this.video.muted = false;
+      }
     }
   }
 
   /** @private */
-  onVolumeStateChange_() {
+  onPresentationVolumeChange_() {
     if (this.video.muted) {
       this.setValue(0);
     } else {
       this.setValue(this.video.volume);
     }
 
+    this.updateColors_();
+  }
+
+  /** @private */
+  onAdVolumeChange_() {
+    goog.asserts.assert(this.ad != null,
+        'This.ad should exist at this point!');
+
+    const volume = this.ad.getVolume();
+    this.setValue(volume);
+    this.updateColors_();
+  }
+
+  /** @private */
+  updateColors_() {
+    const colors = this.config_.volumeBarColors;
     const gradient = ['to right'];
-    gradient.push(shaka.ui.Constants.VOLUME_BAR_VOLUME_LEVEL_COLOR +
-                 (this.getValue() * 100) + '%');
-    gradient.push(shaka.ui.Constants.VOLUME_BAR_BASE_COLOR +
-                 (this.getValue() * 100) + '%');
-    gradient.push(shaka.ui.Constants.VOLUME_BAR_BASE_COLOR + '100%');
+    gradient.push(colors.level + (this.getValue() * 100) + '%');
+    gradient.push(colors.base + (this.getValue() * 100) + '%');
+    gradient.push(colors.base + '100%');
 
     this.container.style.background =
         'linear-gradient(' + gradient.join(',') + ')';

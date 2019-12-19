@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 // Test basic manifest parsing functionality.
@@ -377,6 +365,29 @@ describe('DashParser Manifest', () => {
         expect(stream2.closedCaptions).toEqual(expectedClosedCaptions);
         expect(stream3.closedCaptions).toEqual(expectedClosedCaptions);
       });
+
+  it('Detects E-AC3 JOC content by SupplementalProperty', async () => {
+    const idUri = 'tag:dolby.com,2018:dash:EC3_ExtensionType:2018';
+    const source = [
+      '<MPD>',
+      '  <Period duration="PT30M">',
+      '    <AdaptationSet mimeType="audio/mp4" lang="\u2603">',
+      '      <Representation bandwidth="500">',
+      '        <SupplementalProperty schemeIdUri="' + idUri + '" value="JOC"/>',
+      '        <BaseURL>http://example.com</BaseURL>',
+      '        <SegmentTemplate media="2.mp4" duration="1" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', source);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const stream = manifest.periods[0].variants[0].audio;
+    expect(stream.mimeType).toBe('audio/eac3-joc');
+  });
 
   it('correctly parses closed captions without channel numbers', async () => {
     const source = [
@@ -1188,6 +1199,103 @@ describe('DashParser Manifest', () => {
     expect(textStream.originalId).toBe('text-en');
   });
 
+  it('Disable audio does not create audio streams', async () => {
+    const manifestText = [
+      '<MPD minBufferTime="PT75S">',
+      '  <Period id="1" duration="PT30S">',
+      '    <AdaptationSet id="2" mimeType="video/mp4">',
+      '      <Representation id="video-sd" width="640" height="480">',
+      '        <BaseURL>v-sd.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet id="3" mimeType="audio/mp4">',
+      '      <Representation id="audio-en">',
+      '        <BaseURL>a-en.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', manifestText);
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableAudio = true;
+    parser.configure(config);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const variant = manifest.periods[0].variants[0];
+    expect(variant.audio).toBe(null);
+    expect(variant.video).toBeTruthy();
+  });
+
+  it('Disable video does not create video streams', async () => {
+    const manifestText = [
+      '<MPD minBufferTime="PT75S">',
+      '  <Period id="1" duration="PT30S">',
+      '    <AdaptationSet id="2" mimeType="video/mp4">',
+      '      <Representation id="video-sd" width="640" height="480">',
+      '        <BaseURL>v-sd.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet id="3" mimeType="audio/mp4">',
+      '      <Representation id="audio-en">',
+      '        <BaseURL>a-en.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', manifestText);
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableVideo = true;
+    parser.configure(config);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const variant = manifest.periods[0].variants[0];
+    expect(variant.audio).toBeTruthy();
+    expect(variant.video).toBe(null);
+  });
+
+  it('Disable text does not create text streams', async () => {
+    const manifestText = [
+      '<MPD minBufferTime="PT75S">',
+      '  <Period id="1" duration="PT30S">',
+      '    <AdaptationSet id="2" mimeType="video/mp4">',
+      '      <Representation id="video-sd" width="640" height="480">',
+      '        <BaseURL>v-sd.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet id="3" mimeType="audio/mp4">',
+      '      <Representation id="audio-en">',
+      '        <BaseURL>a-en.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet mimeType="text/vtt" lang="de">',
+      '      <Representation>',
+      '        <BaseURL>http://example.com/de.vtt</BaseURL>',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', manifestText);
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableText = true;
+    parser.configure(config);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const stream = manifest.periods[0].textStreams[0];
+    expect(stream).toBeUndefined();
+  });
+
   it('override manifest value if ignoreMinBufferTime is true', async () => {
     const manifestText = [
       '<MPD minBufferTime="PT75S">',
@@ -1265,6 +1373,31 @@ describe('DashParser Manifest', () => {
     expect(presentationDelay).toBe(config.dash.defaultPresentationDelay);
   });
 
+  it('Honors the ignoreSuggestedPresentationDelay config', async () => {
+    const manifestText = [
+      '<MPD minBufferTime="PT2S" suggestedPresentationDelay="PT25S">',
+      '  <Period id="1" duration="PT30S">',
+      '    <AdaptationSet id="1" mimeType="video/mp4">',
+      '      <Representation id="video-sd" width="640" height="480">',
+      '        <BaseURL>v-sd.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', manifestText);
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.dash.ignoreSuggestedPresentationDelay = true;
+    parser.configure(config);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const presentationTimeline = manifest.presentationTimeline;
+    const presentationDelay = presentationTimeline.getDelay();
+    expect(presentationDelay).toBe(config.dash.defaultPresentationDelay);
+  });
+
   it('converts Accessibility element to "kind"', async () => {
     const manifestText = [
       '<MPD minBufferTime="PT75S">',
@@ -1294,5 +1427,35 @@ describe('DashParser Manifest', () => {
     const textStream = manifest.periods[0].textStreams[0];
     expect(textStream.roles).toEqual(['captions', 'foo']);
     expect(textStream.kind).toBe('caption');
+  });
+
+  it('Does not error when image adaptation sets are present', async () => {
+    const manifestText = [
+      '<MPD minBufferTime="PT75S">',
+      '  <Period id="1" duration="PT30S">',
+      '    <AdaptationSet id="2" mimeType="video/mp4">',
+      '      <Representation id="video-sd" width="640" height="480">',
+      '        <BaseURL>v-sd.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet id="3" mimeType="audio/mp4">',
+      '      <Representation id="audio-en">',
+      '        <BaseURL>a-en.mp4</BaseURL>',
+      '        <SegmentBase indexRange="100-200" />',
+      '      </Representation>',
+      '    </AdaptationSet>',
+      '    <AdaptationSet contentType="image" id="3">',
+      '    </AdaptationSet>',
+      '  </Period>',
+      '</MPD>',
+    ].join('\n');
+
+    fakeNetEngine.setResponseText('dummy://foo', manifestText);
+
+    const manifest = await parser.start('dummy://foo', playerInterface);
+    const variant = manifest.periods[0].variants[0];
+    expect(variant.audio).toBeTruthy();
+    expect(variant.video).toBeTruthy();
   });
 });

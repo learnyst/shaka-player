@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -161,7 +149,7 @@ shakaDemo.Main = class {
     // Optionally enter noinput mode. This has to happen before setting up the
     // player.
     this.noInput_ = 'noinput' in this.getParams_();
-    this.setupPlayer_();
+    await this.setupPlayer_();
     this.readHash_();
     window.addEventListener('hashchange', () => this.hashChanged_());
 
@@ -274,8 +262,11 @@ shakaDemo.Main = class {
     });
   }
 
-  /** @private */
-  setupPlayer_() {
+  /**
+   * @return {!Promise}
+   * @private
+   */
+  async setupPlayer_() {
     const video = /** @type {!HTMLVideoElement} */ (this.video_);
     const ui = video['ui'];
     this.player_ = ui.getControls().getPlayer();
@@ -322,14 +313,43 @@ shakaDemo.Main = class {
     });
 
     // Set up localization lazy-loading.
+    const applyNewLocaleIfPossible = () => {
+      this.localizeHTMLElements_();
+      this.dispatchEventWithName_('shaka-main-locale-changed');
+    };
     const localization = this.controls_.getLocalization();
     const UNKNOWN_LOCALES = shaka.ui.Localization.UNKNOWN_LOCALES;
     localization.addEventListener(UNKNOWN_LOCALES, (event) => {
       for (const locale of event['locales']) {
-        this.loadUILocale_(locale);
+        // This will leave promise rejections uncaught; this is acceptable, as
+        // this function is actually expected to fail fairly often, and has
+        // built-in fallback behavior (from localization events) without needing
+        // to catch the promise rejection.
+        this.loadUILocale_(locale).then(() => {
+          if (locale == this.uiLocale_) {
+            applyNewLocaleIfPossible();
+          }
+        });
       }
     });
-    this.loadUILocale_(this.uiLocale_);
+    const LOCALE_CHANGED = shaka.ui.Localization.LOCALE_CHANGED;
+    localization.addEventListener(LOCALE_CHANGED, (event) => {
+      applyNewLocaleIfPossible();
+    });
+    const initialLocaleLoads = [];
+    initialLocaleLoads.push(this.loadUILocale_(this.uiLocale_));
+    if (this.uiLocale_.includes('-')) {
+      // Also try to load the 'base' localization.
+      // This is so that, for example, the uiLocale_ is set to 'en-US', it will
+      // try to load 'en'.
+      initialLocaleLoads.push(this.loadUILocale_(this.uiLocale_.split('-')[0]));
+    }
+    if (!this.uiLocale_.startsWith('en')) {
+      // Load 'en' as a fallback option, if not already loaded.
+      initialLocaleLoads.push(this.loadUILocale_('en'));
+    }
+    await Promise.all(initialLocaleLoads);
+    this.localizeHTMLElements_();
 
     const drawerCloseButton = document.getElementById('drawer-close-button');
     drawerCloseButton.addEventListener('click', () => {
@@ -415,6 +435,7 @@ shakaDemo.Main = class {
         this.dispatchEventWithName_('shaka-main-offline-progress');
       }
     };
+    storage.configure(this.desiredConfig_);
     storage.configure('offline.progressCallback', progressCallback);
 
     return storage;
@@ -433,6 +454,10 @@ shakaDemo.Main = class {
       return;
     }
 
+    // If the list of stored content does not contain this asset, then make sure
+    // that the asset's |storedContent| value is null. Custom assets that were
+    // once stored might have that object serialized with their other data.
+    asset.storedContent = null;
     for (const storedContent of this.initialStoredList_) {
       const identifier = storedContent.appMetadata['identifier'];
       if (this.getIdentifierFromAsset_(asset) == identifier) {
@@ -533,12 +558,13 @@ shakaDemo.Main = class {
    *
    * @param {!ShakaDemoAssetInfo} asset
    * @param {boolean} needOffline True if offline support is required.
-   * @return {?string} unsupportedReason Null if asset is supported.
+   * @return {?shakaDemo.MessageIds} unsupportedReason
+   *   Null if asset is supported.
    */
   getAssetUnsupportedReason(asset, needOffline) {
     if (needOffline &&
         (!shaka.offline.Storage.support() || !this.initialStoredList_)) {
-      return 'Your browser does not support offline storage.';
+      return shakaDemo.MessageIds.UNSUPPORTED_NO_OFFLINE;
     }
 
     if (asset.source == shakaAssets.Source.CUSTOM) {
@@ -549,28 +575,28 @@ shakaDemo.Main = class {
 
     // Is the asset disabled?
     if (asset.disabled) {
-      return 'This asset is disabled.';
+      return shakaDemo.MessageIds.UNSUPPORTED_DISABLED;
     }
 
     if (needOffline && !asset.features.includes(shakaAssets.Feature.OFFLINE)) {
-      return 'This asset cannot be downloaded.';
+      return shakaDemo.MessageIds.UNSUPPORTED_NO_DOWNLOAD;
     }
 
     if (!asset.isClear()) {
       const hasSupportedDRM = asset.drm.some((drm) => {
-        return this.support_.drm[drm];
+        return this.support_.drm[shakaAssets.identifierForKeySystem(drm)];
       });
       if (!hasSupportedDRM) {
-        return 'Your browser does not support the required key systems.';
+        return shakaDemo.MessageIds.UNSUPPORTED_NO_KEY_SUPPORT;
       }
       if (needOffline) {
         const hasSupportedOfflineDRM = asset.drm.some((drm) => {
-          return this.support_.drm[drm] &&
-                 this.support_.drm[drm].persistentState;
+          const identifier = shakaAssets.identifierForKeySystem(drm);
+          return this.support_.drm[identifier] &&
+                 this.support_.drm[identifier].persistentState;
         });
         if (!hasSupportedOfflineDRM) {
-          return 'Your browser does not support offline licenses for the ' +
-                 'required key systems.';
+          return shakaDemo.MessageIds.UNSUPPORTED_NO_LICENSE_SUPPORT;
         }
       }
     }
@@ -578,11 +604,11 @@ shakaDemo.Main = class {
     // Does the browser support the asset's manifest type?
     if (asset.features.includes(shakaAssets.Feature.DASH) &&
         !this.support_.manifest['mpd']) {
-      return 'Your browser does not support MPEG-DASH manifests.';
+      return shakaDemo.MessageIds.UNSUPPORTED_NO_DASH_SUPPORT;
     }
     if (asset.features.includes(shakaAssets.Feature.HLS) &&
         !this.support_.manifest['m3u8']) {
-      return 'Your browser does not support HLS manifests.';
+      return shakaDemo.MessageIds.UNSUPPORTED_NO_HLS_SUPPORT;
     }
 
     // Does the asset contain a playable mime type?
@@ -600,7 +626,7 @@ shakaDemo.Main = class {
       return this.support_.media[type];
     });
     if (!hasSupportedMimeType) {
-      return 'Your browser does not support the required video format.';
+      return shakaDemo.MessageIds.UNSUPPORTED_NO_FORMAT_SUPPORT;
     }
 
     return null;
@@ -627,6 +653,30 @@ shakaDemo.Main = class {
   }
 
   /**
+   * Look through all elements in the DOM, and look for things tagged as having
+   * a localized string. Then, localize them.
+   *
+   * @private
+   */
+  localizeHTMLElements_() {
+    for (const element of document.querySelectorAll('[localized-string]')) {
+      const key = element.getAttribute('localized-string');
+      const value = shakaDemo.MessageIds[key];
+      if (value) {
+        element.textContent = this.getLocalizedString(value);
+      }
+    }
+  }
+
+  /**
+   * @param {!shakaDemo.MessageIds} string
+   * @return {string}
+   */
+  getLocalizedString(string) {
+    return this.controls_.getLocalization().resolve(string);
+  }
+
+  /**
    * @param {string} locale
    * @return {!Promise}
    * @private
@@ -635,21 +685,26 @@ shakaDemo.Main = class {
     if (!locale) {
       return;
     }
-    const url = '../ui/locales/' + locale + '.json';
-    const response = await fetch(url);
-    if (!response.ok) {
-      console.warn('Unable to load locale', locale);
-      return;
-    }
-
-    const obj = await response.json();
-    const map = new Map();
-    for (const key in obj) {
-      map.set(key, obj[key]);
-    }
 
     const localization = this.controls_.getLocalization();
-    localization.insert(locale, map);
+    const load = async (urlBase) => {
+      const url = urlBase + '/locales/' + locale + '.json';
+      const response = await fetch(url);
+      if (!response.ok) {
+        console.warn('Unable to load locale', locale, 'for url', url);
+        return;
+      }
+
+      // eslint-disable-next-line no-await-in-loop
+      const obj = await response.json();
+      const map = new Map();
+      for (const key in obj) {
+        map.set(key, obj[key]);
+      }
+
+      localization.insert(locale, map);
+    };
+    await Promise.all([load('../ui'), load('../demo')]);
   }
 
   /** @param {string} locale */
@@ -737,6 +792,20 @@ shakaDemo.Main = class {
       };
       const config = this.player_.getConfiguration();
       shakaDemo.Utils.runThroughHashParams(readParam, config);
+      const advanced = this.getCurrentConfigValue('drm.advanced');
+      if (advanced) {
+        for (const drmSystem of shakaDemo.Main.commonDrmSystems) {
+          if (!advanced[drmSystem]) {
+            advanced[drmSystem] = shakaDemo.Config.emptyAdvancedConfiguration();
+          }
+          if ('videoRobustness' in params) {
+            advanced[drmSystem].videoRobustness = params['videoRobustness'];
+          }
+          if ('audioRobustness' in params) {
+            advanced[drmSystem].audioRobustness = params['audioRobustness'];
+          }
+        }
+      }
     }
     if ('lang' in params) {
       // Load the legacy 'lang' hash value.
@@ -1106,6 +1175,21 @@ shakaDemo.Main = class {
       };
       const config = this.player_.getConfiguration();
       shakaDemo.Utils.runThroughHashParams(setParam, config);
+      const advanced = this.getCurrentConfigValue('drm.advanced');
+      if (advanced) {
+        for (const drmSystem of shakaDemo.Main.commonDrmSystems) {
+          const advancedFor = advanced[drmSystem];
+          if (advancedFor) {
+            if (advancedFor.videoRobustness) {
+              params.push('videoRobustness=' + advancedFor.videoRobustness);
+            }
+            if (advancedFor.audioRobustness) {
+              params.push('audioRobustness=' + advancedFor.audioRobustness);
+            }
+            break;
+          }
+        }
+      }
     }
     if (!this.getCurrentConfigValue('abr.enabled')) {
       params.push('noadaptation');
@@ -1137,7 +1221,7 @@ shakaDemo.Main = class {
     for (const button of navButtons.childNodes) {
       if (button.nodeType == Node.ELEMENT_NODE &&
           button.classList.contains('mdl-button--accent')) {
-        params.push('panel=' + button.textContent);
+        params.push('panel=' + button.getAttribute('tab-identifier'));
         break;
       }
     }
@@ -1239,7 +1323,8 @@ shakaDemo.Main = class {
 
     // Determine if the element is selected.
     const params = this.getParams_();
-    let selected = params['panel'] == encodeURI(button.textContent);
+    let selected =
+        params['panel'] == encodeURI(button.getAttribute('tab-identifier'));
     if (!selected && !params['panel']) {
       // Check if it's selected by default.
       selected = button.getAttribute('defaultselected') != null;
@@ -1381,6 +1466,7 @@ shakaDemo.Main = class {
     // Always show the new error if:
     //   1. there is no error showing currently
     //   2. the new error is more severe than the old one
+    // Sadly, we do not (yet?) have localizations for error messages.
     if (link.severity == null || severity > link.severity) {
       link.href = href;
       // IE8 and other very old browsers don't have textContent.

@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('StreamingEngine', () => {
@@ -53,10 +41,9 @@ describe('StreamingEngine', () => {
   let videoStream1;
   let variant1;
   let textStream1;
+  let alternateVariant1;
   let alternateVideoStream1;
 
-  let audioStream2;
-  let videoStream2;
   let variant2;
   let textStream2;
 
@@ -301,8 +288,15 @@ describe('StreamingEngine', () => {
         12 /* segmentsInFirstPeriod */,
         2 /* segmentsInSecondPeriod */);
 
+    // NOTE: Many tests here start playback at 100, so the availability start is
+    // 90.  This allows the async index creation processes to complete before
+    // the window moves, which gives us the startup conditions the tests expect.
+    // Keep in mind that the fake event loop in the tests ticks in whole
+    // seconds, so real async processes may take a surprising amount of fake
+    // time to complete.  To test actual boundary conditions, you can change
+    // timeline.segmentAvailabilityStart in the test setup.
     timeline = shaka.test.StreamingEngineUtil.createFakePresentationTimeline(
-        100 /* segmentAvailabilityStart */,
+        90 /* segmentAvailabilityStart */,
         140 /* segmentAvailabilityEnd */,
         140 /* presentationDuration */,
         10 /* maxSegmentDuration */,
@@ -360,13 +354,10 @@ describe('StreamingEngine', () => {
     textStream1 = manifest.periods[0].textStreams[0];
 
     // This Stream is only used to verify that StreamingEngine can setup
-    // Streams correctly. It does not have init or media segments.
+    // Streams correctly.
     alternateVideoStream1 =
         shaka.test.StreamingEngineUtil.createMockVideoStream(8);
-    alternateVideoStream1.createSegmentIndex.and.returnValue(Promise.resolve());
-    alternateVideoStream1.segmentIndex.find.and.returnValue(null);
-    alternateVideoStream1.segmentIndex.get.and.returnValue(null);
-    const variant = {
+    alternateVariant1 = {
       audio: null,
       video: /** @type {shaka.extern.Stream} */ (alternateVideoStream1),
       id: 0,
@@ -377,10 +368,8 @@ describe('StreamingEngine', () => {
       allowedByApplication: true,
       allowedByKeySystem: true,
     };
-    manifest.periods[0].variants.push(variant);
+    manifest.periods[0].variants.push(alternateVariant1);
 
-    audioStream2 = manifest.periods[1].variants[0].audio;
-    videoStream2 = manifest.periods[1].variants[0].video;
     variant2 = manifest.periods[1].variants[0];
     textStream2 = manifest.periods[1].textStreams[0];
   }
@@ -490,7 +479,6 @@ describe('StreamingEngine', () => {
       expect(period).toBe(manifest.periods[0]);
 
       onCanSwitch.and.callFake(() => {
-        expect(alternateVideoStream1.createSegmentIndex).toHaveBeenCalled();
         expect(mediaSourceEngine.reinitText).not.toHaveBeenCalled();
         mediaSourceEngine.reinitText.calls.reset();
         onCanSwitch.and.throwError(new Error());
@@ -515,9 +503,6 @@ describe('StreamingEngine', () => {
         verifyNetworkingEngineRequestCalls(1);
 
         onCanSwitch.and.callFake(() => {
-          expect(audioStream2.createSegmentIndex).toHaveBeenCalled();
-          expect(videoStream2.createSegmentIndex).toHaveBeenCalled();
-          expect(textStream2.createSegmentIndex).toHaveBeenCalled();
           expect(mediaSourceEngine.reinitText).toHaveBeenCalled();
           mediaSourceEngine.reinitText.calls.reset();
           onCanSwitch.and.throwError(new Error());
@@ -544,12 +529,6 @@ describe('StreamingEngine', () => {
       expect(mediaSourceEngine.setDuration).toHaveBeenCalledTimes(1);
       expect(mediaSourceEngine.setDuration).toHaveBeenCalledWith(40);
       mediaSourceEngine.setDuration.calls.reset();
-
-      expect(audioStream1.createSegmentIndex).toHaveBeenCalled();
-      expect(videoStream1.createSegmentIndex).toHaveBeenCalled();
-      expect(textStream1.createSegmentIndex).toHaveBeenCalled();
-
-      expect(alternateVideoStream1.createSegmentIndex).not.toHaveBeenCalled();
     });
 
     // Here we go!
@@ -658,11 +637,13 @@ describe('StreamingEngine', () => {
     });
 
     // Since we started playback from segment 11, segments 10 through 14
-    // should be buffered.
+    // should be buffered.  Those segment numbers are 1-based, and this array
+    // is 0-based, so we expect i >= 9 to be downloaded.
+    const segments = mediaSourceEngine.segments;
     for (const i of shaka.util.Iterables.range(14)) {
-      expect(mediaSourceEngine.segments[ContentType.AUDIO][i]).toBe(i >= 9);
-      expect(mediaSourceEngine.segments[ContentType.VIDEO][i]).toBe(i >= 9);
-      expect(mediaSourceEngine.segments[ContentType.TEXT][i]).toBe(i >= 9);
+      expect(segments[ContentType.AUDIO][i]).withContext(i).toBe(i >= 9);
+      expect(segments[ContentType.VIDEO][i]).withContext(i).toBe(i >= 9);
+      expect(segments[ContentType.TEXT][i]).withContext(i).toBe(i >= 9);
     }
   });
 
@@ -812,6 +793,7 @@ describe('StreamingEngine', () => {
     // For the first update, indicate the segment isn't available.  This should
     // not cause us to fallback to the Playhead time to determine which segment
     // to start streaming.
+    await textStream2.createSegmentIndex();
     const oldGet = textStream2.segmentIndex.get;
     textStream2.segmentIndex.get = (idx) => {
       if (idx == 1) {
@@ -1809,33 +1791,36 @@ describe('StreamingEngine', () => {
       createStreamingEngine();
     });
 
-    it('from initial Stream setup', async () => {
-      videoStream1.createSegmentIndex.and.returnValue(
-          Promise.reject('FAKE_ERROR'));
+    it('from Stream setup', async () => {
+      // Don't use returnValue with Promise.reject, or it may be detected as an
+      // unhandled Promise rejection.
+      videoStream1.createSegmentIndex.and.callFake(
+          () => Promise.reject('FAKE_ERROR'));
 
-      const onInitError = jasmine.createSpy('onInitError');
-      onInitError.and.callFake((error) => {
-        expect(onInitialStreamsSetup).not.toHaveBeenCalled();
-        expect(onStartupComplete).not.toHaveBeenCalled();
+      onError.and.callFake((error) => {
         expect(error).toBe('FAKE_ERROR');
       });
 
-      // Here we go!
       onChooseStreams.and.callFake((p) => defaultOnChooseStreams(p));
-      streamingEngine.start().then(fail, Util.spyFunc(onInitError));
 
+      // Here we go!
+      streamingEngine.start();
       await runTest();
-      expect(onInitError).toHaveBeenCalled();
-      expect(onError).not.toHaveBeenCalled();
+
+      expect(videoStream1.createSegmentIndex).toHaveBeenCalled();
+      expect(onError).toHaveBeenCalled();
     });
 
-    it('from post startup Stream setup', async () => {
+    it('from Stream setup on switch', async () => {
       const expectedError = new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.NETWORK,
           shaka.util.Error.Code.HTTP_ERROR);
-      alternateVideoStream1.createSegmentIndex.and.returnValue(
-          Promise.reject(expectedError));
+
+      // Don't use returnValue with Promise.reject, or it may be detected as an
+      // unhandled Promise rejection.
+      alternateVideoStream1.createSegmentIndex.and.callFake(
+          () => Promise.reject(expectedError));
 
       onError.and.callFake((error) => {
         expect(onInitialStreamsSetup).toHaveBeenCalled();
@@ -1843,10 +1828,19 @@ describe('StreamingEngine', () => {
         expect(error).toBe(expectedError);
       });
 
-      // Here we go!
       onChooseStreams.and.callFake((p) => defaultOnChooseStreams(p));
+      onCanSwitch.and.callFake(() => {
+        streamingEngine.switchVariant(
+            alternateVariant1, /* clear_buffer= */ true, /* safe_margin= */ 0);
+      });
+
+      // Here we go!
       streamingEngine.start().catch(fail);
       await runTest();
+
+      expect(videoStream1.createSegmentIndex).toHaveBeenCalled();
+      expect(onCanSwitch).toHaveBeenCalled();
+      expect(alternateVideoStream1.createSegmentIndex).toHaveBeenCalled();
       expect(onError).toHaveBeenCalled();
     });
 
@@ -2178,23 +2172,23 @@ describe('StreamingEngine', () => {
     it('does not resume streaming after quota error', async () => {
       setupVod();
 
-      const appendBufferSpy = jasmine.createSpy('appendBuffer');
-      // Throw QuotaExceededError on every segment to quickly trigger the quota
-      // error.
-      appendBufferSpy.and.callFake((type, data, startTime, endTime) => {
-        throw new shaka.util.Error(
-            shaka.util.Error.Severity.CRITICAL,
-            shaka.util.Error.Category.MEDIA,
-            shaka.util.Error.Code.QUOTA_EXCEEDED_ERROR,
-            type);
-      });
-
       mediaSourceEngine = new shaka.test.FakeMediaSourceEngine(segmentData);
-      mediaSourceEngine.appendBuffer = appendBufferSpy;
       createStreamingEngine();
 
       onStartupComplete.and.callFake(() => {
         setupFakeGetTime(0);
+
+        // Now that setup is complete, throw QuotaExceededError on every segment
+        // to quickly trigger the quota error.
+        const appendBufferSpy = jasmine.createSpy('appendBuffer');
+        appendBufferSpy.and.callFake((type, data, startTime, endTime) => {
+          throw new shaka.util.Error(
+              shaka.util.Error.Severity.CRITICAL,
+              shaka.util.Error.Category.MEDIA,
+              shaka.util.Error.Code.QUOTA_EXCEEDED_ERROR,
+              type);
+        });
+        mediaSourceEngine.appendBuffer = appendBufferSpy;
       });
 
       onError.and.callFake((error) => {
@@ -2591,10 +2585,14 @@ describe('StreamingEngine', () => {
         text: [],
       });
 
+      // Since we started playback from segment 11, segments 10 through 14
+      // should be buffered.  Those segment numbers are 1-based, and this array
+      // is 0-based, so we expect i >= 9 to be downloaded.
+      const segments = mediaSourceEngine.segments;
       for (const i of shaka.util.Iterables.range(14)) {
-        expect(mediaSourceEngine.segments['audio'][i]).toBe(i >= 9);
-        expect(mediaSourceEngine.segments['video'][i]).toBe(i >= 9);
-        expect(mediaSourceEngine.segments['text'][i]).toBe(i >= 9);
+        expect(segments[ContentType.AUDIO][i]).withContext(i).toBe(i >= 9);
+        expect(segments[ContentType.VIDEO][i]).withContext(i).toBe(i >= 9);
+        expect(segments[ContentType.TEXT][i]).withContext(i).toBe(i >= 9);
       }
     }
 
@@ -2810,10 +2808,10 @@ describe('StreamingEngine', () => {
     let newVariant;
     /** @type {!Array.<string>} */
     let requestUris;
-    /** @type {shaka.util.PublicPromise} */
-    let delayedRequest;
+    /** @type {!Array.<shaka.util.PublicPromise>} */
+    let delayedRequests;
     /** @type {shaka.net.NetworkingEngine.PendingRequest} */
-    let lastResponse;
+    let lastPendingRequest;
     /** @type {boolean} */
     let shouldDelayRequests;
 
@@ -2843,8 +2841,8 @@ describe('StreamingEngine', () => {
       const initialVariant = manifest.periods[0].variants[0];
       newVariant = manifest.periods[0].variants[1];
       requestUris = [];
-      delayedRequest = null;
-      lastResponse = null;
+      delayedRequests = [];
+      lastPendingRequest = null;
       shouldDelayRequests = true;
       playing = false;
       presentationTimeInSeconds = 0;
@@ -2858,29 +2856,35 @@ describe('StreamingEngine', () => {
           const bytes = new shaka.net.NetworkingEngine.NumBytesRemainingClass();
           bytes.setBytes(200);
 
-          delayedRequest = new shaka.util.PublicPromise();
+          const delay = new shaka.util.PublicPromise();
+          delayedRequests.push(delay);
+
           const run = async () => {
+            shaka.log.v1('new request', request.uris[0]);
             if (shouldDelayRequests) {
-              await delayedRequest;
+              shaka.log.v1('delaying request', request.uris[0]);
+              await delay;
             }
             // Only add if the segment was appended; if it was aborted this
             // won't be called.
+            shaka.log.v1('completing request', request.uris[0]);
             requestUris.push(request.uris[0]);
             return response;
           };
+
           const abort = () => {
-            delayedRequest.reject(new shaka.util.Error(
+            shaka.log.v1('aborting request', request.uris[0]);
+            delay.reject(new shaka.util.Error(
                 shaka.util.Error.Severity.CRITICAL,
                 shaka.util.Error.Category.PLAYER,
                 shaka.util.Error.Code.OPERATION_ABORTED));
             return Promise.resolve();
           };
-          const ret = new shaka.net.NetworkingEngine.PendingRequest(
-              run(), abort, bytes);
 
-          spyOn(ret, 'abort').and.callThrough();
-          lastResponse = ret;
-          return ret;
+          lastPendingRequest = new shaka.net.NetworkingEngine.PendingRequest(
+              run(), abort, bytes);
+          spyOn(lastPendingRequest, 'abort').and.callThrough();
+          return lastPendingRequest;
         },
       };
 
@@ -2916,37 +2920,28 @@ describe('StreamingEngine', () => {
     });
 
     it('aborts pending requests', async () => {
-      streamingEngine.start().catch(fail);
-      await Util.fakeEventLoop(1);
+      await prepareForAbort();
 
-      // Finish the first request.
-      delayedRequest.resolve();
-      await Util.fakeEventLoop(10);
-      // We should have buffered the first segment and finished startup.
-      expect(onCanSwitch).toHaveBeenCalled();
-      expect(Util.invokeSpy(mediaSourceEngine.bufferEnd, 'video')).toBe(10);
+      /** @type {shaka.net.NetworkingEngine.PendingRequest} */
+      const secondRequest = lastPendingRequest;
 
       // This should abort the pending request for the second segment.
-      /** @type {shaka.net.NetworkingEngine.PendingRequest} */
-      const oldResponse = lastResponse;
       streamingEngine.switchVariant(
           newVariant, /* clear_buffer= */ false, /* safe_margin= */ 0);
-      await Util.fakeEventLoop(1);
-      expect(oldResponse.abort).toHaveBeenCalled();
 
-      // Finish the second request for the new stream.
-      delayedRequest.resolve();
-      await Util.fakeEventLoop(1);
-      expect(Util.invokeSpy(mediaSourceEngine.bufferEnd, 'video')).toBe(20);
-      expect(requestUris).toEqual(['video-10-0.mp4', 'video-11-1.mp4']);
+      await bufferAndCheck(/* didAbort= */ true);
+
+      expect(secondRequest.abort).toHaveBeenCalled();
     });
 
     it('still aborts if previous segment size unknown', async () => {
       // This should use the "bytes remaining" from the request instead of the
       // previous stream's size.
-      const segmentIndex = manifest.periods[0].variants[0].video.segmentIndex;
+      const videoStream = manifest.periods[0].variants[0].video;
+      await videoStream.createSegmentIndex();
+      const segmentIndex = videoStream.segmentIndex;
       const oldGet = segmentIndex.get;
-      manifest.periods[0].variants[0].video.segmentIndex.get = (idx) => {
+      videoStream.segmentIndex.get = (idx) => {
         // eslint-disable-next-line no-restricted-syntax
         const seg = oldGet.call(segmentIndex, idx);
         if (seg) {
@@ -2979,6 +2974,7 @@ describe('StreamingEngine', () => {
     it('doesn\'t abort if init segment is too large', async () => {
       const initSegmentReference =
           new shaka.media.InitSegmentReference(() => ['init-11.mp4'], 0, 500);
+      await newVariant.video.createSegmentIndex();
       overrideInitSegment(newVariant.video, initSegmentReference);
 
       await prepareForAbort();
@@ -2991,6 +2987,7 @@ describe('StreamingEngine', () => {
     it('still aborts with small init segment', async () => {
       const initSegmentReference =
           new shaka.media.InitSegmentReference(() => ['init-11.mp4'], 0, 5);
+      await newVariant.video.createSegmentIndex();
       overrideInitSegment(newVariant.video, initSegmentReference);
 
       await prepareForAbort();
@@ -3004,6 +3001,7 @@ describe('StreamingEngine', () => {
       // Very large init segment
       const initSegmentReference =
           new shaka.media.InitSegmentReference(() => ['init-11.mp4'], 0, 5e6);
+      await newVariant.video.createSegmentIndex();
       overrideInitSegment(newVariant.video, initSegmentReference);
 
       await prepareForAbort();
@@ -3017,6 +3015,39 @@ describe('StreamingEngine', () => {
       await bufferAndCheck(/* didAbort= */ true, /* hasInit= */ true);
     });
 
+    it('aborts pending requests after fetching new segment index', async () => {
+      await prepareForAbort();
+
+      /** @type {shaka.net.NetworkingEngine.PendingRequest} */
+      const secondRequest = lastPendingRequest;
+
+      // Simulate a segment index which is not yet available.  This is
+      // necessary because the fake content used in this test is in the style
+      // of a segment template, where the index is already known.
+      const segmentIndex = newVariant.video.segmentIndex;
+      expect(segmentIndex).not.toBe(null);
+      newVariant.video.segmentIndex = null;
+      newVariant.video.createSegmentIndex = () => {
+        newVariant.video.segmentIndex = segmentIndex;
+        return Promise.resolve();
+      };
+
+      // This should abort the pending request for the second segment.
+      streamingEngine.switchVariant(
+          newVariant, /* clear_buffer= */ false, /* safe_margin= */ 0);
+
+      await bufferAndCheck(/* didAbort= */ true);
+
+      expect(secondRequest.abort).toHaveBeenCalled();
+    });
+
+    function flushDelayedRequests() {
+      for (const delay of delayedRequests) {
+        delay.resolve();
+      }
+      delayedRequests = [];
+    }
+
     /**
      * Creates and starts the StreamingEngine instance.  After this returns,
      * it should be waiting for the second segment request to complete.
@@ -3026,11 +3057,16 @@ describe('StreamingEngine', () => {
       await Util.fakeEventLoop(1);
 
       // Finish the first segment request.
-      delayedRequest.resolve();
+      shaka.log.v1('continuing initial request');
+      flushDelayedRequests();
       await Util.fakeEventLoop(10);
+
+      // We should have buffered the first segment and finished startup.
+      expect(onCanSwitch).toHaveBeenCalled();
       expect(Util.invokeSpy(mediaSourceEngine.bufferEnd, 'video')).toBe(10);
 
-      expect(onCanSwitch).toHaveBeenCalled();
+      // Confirm that the first segment is buffered.
+      expect(requestUris).toEqual(['video-10-0.mp4']);
     }
 
     /**
@@ -3040,8 +3076,12 @@ describe('StreamingEngine', () => {
      * @param {boolean=} hasInit
      */
     async function bufferAndCheck(didAbort, hasInit) {
+      // Wait long enough for the abort() call take place.
+      await Util.fakeEventLoop(1);
+
+      shaka.log.v1('continuing delayed request, unblocking future requests');
       shouldDelayRequests = false;
-      delayedRequest.resolve();
+      flushDelayedRequests();
       await Util.fakeEventLoop(3);
 
       expect(Util.invokeSpy(mediaSourceEngine.bufferEnd, 'video')).toBe(30);
@@ -3066,7 +3106,7 @@ describe('StreamingEngine', () => {
      * @suppress {accessControls}
      */
     function setBytesRemaining(bytes) {
-      lastResponse.bytesRemaining_.setBytes(bytes);
+      lastPendingRequest.bytesRemaining_.setBytes(bytes);
     }
   });
 
@@ -3206,6 +3246,48 @@ describe('StreamingEngine', () => {
             .toHaveBeenCalledTimes(1);
       }
     });
+  });
+
+  it('calls createSegmentIndex on demand', async () => {
+    setupVod();
+    mediaSourceEngine = new shaka.test.FakeMediaSourceEngine(segmentData);
+    createStreamingEngine();
+
+    onStartupComplete.and.callFake(() => setupFakeGetTime(0));
+    onChooseStreams.and.callFake((period) => defaultOnChooseStreams(period));
+
+    // None of the first period streams have been set up yet because we haven't
+    // started yet.
+    expect(audioStream1.createSegmentIndex).not.toHaveBeenCalled();
+    expect(videoStream1.createSegmentIndex).not.toHaveBeenCalled();
+    expect(alternateVideoStream1.createSegmentIndex).not.toHaveBeenCalled();
+
+    // None of the second period streams have been set up yet, either.
+    expect(variant2.video.createSegmentIndex).not.toHaveBeenCalled();
+    expect(variant2.audio.createSegmentIndex).not.toHaveBeenCalled();
+
+    onInitialStreamsSetup.and.callFake(() => {
+      // Once we're streaming, the first period audio & video streams have been
+      // set up.
+      expect(audioStream1.createSegmentIndex).toHaveBeenCalled();
+      expect(videoStream1.createSegmentIndex).toHaveBeenCalled();
+
+      // But not this alternate video stream from the first period.
+      expect(alternateVideoStream1.createSegmentIndex).not.toHaveBeenCalled();
+
+      // And not the streams from the second period.
+      expect(variant2.video.createSegmentIndex).not.toHaveBeenCalled();
+      expect(variant2.audio.createSegmentIndex).not.toHaveBeenCalled();
+    });
+
+    // Here we go!
+    streamingEngine.start();
+
+    await runTest();
+
+    // Because we never switched to this stream, it was never set up at any time
+    // during this simulated playback.
+    expect(alternateVideoStream1.createSegmentIndex).not.toHaveBeenCalled();
   });
 
   /**

@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -198,6 +186,7 @@ shaka.extern.BufferedInfo;
  *   videoId: ?number,
  *   audioId: ?number,
  *   channelsCount: ?number,
+ *   audioSamplingRate: ?number,
  *   audioBandwidth: ?number,
  *   videoBandwidth: ?number,
  *   originalVideoId: ?string,
@@ -263,6 +252,8 @@ shaka.extern.BufferedInfo;
  *   (only for variant tracks) The audio stream id.
  * @property {?number} channelsCount
  *   The count of the audio track channels.
+ * @property {?number} audioSamplingRate
+ *   Specifies the maximum sampling rate of the content.
  * @property {?number} audioBandwidth
  *   (only for variant tracks) The audio stream's bandwidth if known.
  * @property {?number} videoBandwidth
@@ -541,7 +532,8 @@ shaka.extern.DrmConfiguration;
  *   defaultPresentationDelay: number,
  *   ignoreMinBufferTime: boolean,
  *   autoCorrectDrift: boolean,
- *   initialSegmentLimit: number
+ *   initialSegmentLimit: number,
+ *   ignoreSuggestedPresentationDelay: boolean
  * }}
  *
  * @property {shaka.extern.DashContentProtectionCallback} customScheme
@@ -581,6 +573,10 @@ shaka.extern.DrmConfiguration;
  *   <code>SegmentTemplate</code> with fixed-duration segments.  This is limited
  *   to avoid excessive memory consumption with very large
  *   <code>timeShiftBufferDepth</code> values.
+ * @property {boolean} ignoreSuggestedPresentationDelay
+ *   If true will cause DASH parser to ignore
+ *   <code>suggestedPresentationDelay</code> from manifest. Defaults to
+ *   <code>false</code> if not provided.
  * @exportDoc
  */
 shaka.extern.DashManifestConfiguration;
@@ -603,6 +599,9 @@ shaka.extern.HlsManifestConfiguration;
  * @typedef {{
  *   retryParameters: shaka.extern.RetryParameters,
  *   availabilityWindowOverride: number,
+ *   disableAudio: boolean,
+ *   disableVideo: boolean,
+ *   disableText: boolean,
  *   dash: shaka.extern.DashManifestConfiguration,
  *   hls: shaka.extern.HlsManifestConfiguration
  * }}
@@ -614,6 +613,15 @@ shaka.extern.HlsManifestConfiguration;
  *   manifest, or <code>NaN</code> if the default value should be used.  This is
  *   enforced by the manifest parser, so custom manifest parsers should take
  *   care to honor this parameter.
+ * @property {boolean} disableAudio
+ *   If <code>true</code>, the audio tracks are ignored.
+ *   Defaults to <code>false</code>.
+ * @property {boolean} disableVideo
+ *   If <code>true</code>, the video tracks are ignored.
+ *   Defaults to <code>false</code>.
+ * @property {boolean} disableText
+ *   If <code>true</code>, the text tracks are ignored.
+ *   Defaults to <code>false</code>.
  * @property {shaka.extern.DashManifestConfiguration} dash
  *   Advanced parameters used by the DASH manifest parser.
  * @property {shaka.extern.HlsManifestConfiguration} hls
@@ -853,8 +861,8 @@ shaka.extern.OfflineConfiguration;
  *   Optional playback and seek end time in seconds. Defaults to the end of
  *   the presentation if not provided.
  * @property {shaka.extern.TextDisplayer.Factory} textDisplayFactory
- *   A factory to construct text displayer. Note that, if this is changed during
- *   playback, it will cause the text tracks to be reloaded.
+ *   A factory to construct a text displayer. Note that, if this is changed
+ *   during playback, it will cause the text tracks to be reloaded.
  * @exportDoc
  */
 shaka.extern.PlayerConfiguration;

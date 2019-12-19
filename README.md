@@ -33,20 +33,20 @@ For details on what's coming next, see our [development roadmap](roadmap.md).
 |Edge¹      |**Y**     | -       | -       | -       | -        | -      | -   |
 |IE ≤ 10    | N        | -       | -       | -       | -        | -      | -   |
 |IE 11      |**Y** ⁴   | -       | -       | -       | -        | -      | -   |
-|Safari¹    | -        |**Y**    | -       | -       |**Native**| -      | -   |
+|Safari¹    | -        |**Y**    | -       | -       |**iPadOS 13<br>Native**| - | - |
 |Opera¹     |untested⁵ |untested⁵|untested⁵|untested⁵|**Native**| -      | -   |
 |Chromecast²| -        | -       | -       | -       | -        | -      |**Y**|
 |Tizen TV³  | -        | -       | -       | -       | -        | -      |**Y**|
 
 NOTES:
  - ¹: Only the latest stable version is tested and supported. Older releases may still be usable, and we will accept pull requests for them, but they will not be officially tested or supported.
- - ²: Latest stable Chromecast firmware is tested. Both sender and receiver can be implemented with Shaka Player.
+ - ²: The latest stable Chromecast firmware is tested. Both sender and receiver can be implemented with Shaka Player.
  - ³: Tizen 2017 model is actively tested and supported by the Shaka Player team. Tizen 2016 model is community-supported and untested by us.
  - ⁴: IE 11 offers PlayReady support on Windows 8.1 and Windows 10 only. IE 11 can play clear content on Windows 8.0. IE 11 does not support adaptive playback on Windows 7 and under.
  - ⁵: These are expected to work, but are not actively tested by the Shaka Player team.
 
 We support iOS through Apple's native HLS player.  We provide the same top-level
-API, but we just set the video's `src` element to the manfiest/media.  So we are
+API, but we just set the video's `src` element to the manifest/media.  So we are
 dependent on the browser supporting the manifests.
 
 ### Shaka Player Embedded (for native iOS)
@@ -182,6 +182,19 @@ attributes.
 If you have improvements or fixes, we would love to have your contributions.
 Please read CONTRIBUTING.md for more information on the process we would like
 contributors to follow.
+
+
+## Framework Integrations ##
+
+The Shaka team doesn't have the bandwidth and experience to provide guidance and support
+for integrating Shaka Player with specific frameworks, but some of our users have
+sucessfully done so and created tutorials to help other beginners.
+Shaka + ReactJS integrations:
+- https://github.com/matvp91/shaka-player-react
+- https://github.com/amit08255/shaka-player-react-with-ui-config
+
+If you have published Shaka Integration code/tutorials, please let us know, we'd
+love to add it top the list!
 
 
 ## FAQ ##

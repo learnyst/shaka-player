@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -21,7 +9,6 @@ goog.provide('shaka.ui.Overlay');
 goog.require('goog.asserts');
 goog.require('shaka.Deprecate');
 goog.require('shaka.polyfill');
-goog.require('shaka.ui.AdManager');
 goog.require('shaka.ui.Controls');
 goog.require('shaka.ui.TextDisplayer');
 goog.require('shaka.util.Platform');
@@ -75,12 +62,6 @@ shaka.ui.Overlay = class {
 
     videoContainer['ui'] = this;
     video['ui'] = this;
-
-    this.adManager_ = null;
-
-    if (window['google'] && google.ima) {
-      this.adManager_ = new shaka.ui.AdManager(this.controls_);
-    }
   }
 
 
@@ -119,15 +100,6 @@ shaka.ui.Overlay = class {
         ret, this.config_, this.defaultConfig_(),
         /* overrides (only used for player config)*/ {}, /* path */ '');
     return ret;
-  }
-
-
-  /**
-   * @return {shaka.ui.AdManager}
-   * @export
-   */
-  getAdManager() {
-    return this.adManager_;
   }
 
 
@@ -228,6 +200,15 @@ shaka.ui.Overlay = class {
       addBigPlayButton: true,
       castReceiverAppId: '',
       clearBufferOnQualityChange: true,
+      seekBarColors: {
+        base: 'rgba(255, 255, 255, 0.3)',
+        buffered: 'rgba(255, 255, 255, 0.54)',
+        played: 'rgb(255, 255, 255)',
+      },
+      volumeBarColors: {
+        base: 'rgba(255, 255, 255, 0.54)',
+        level: 'rgb(255, 255, 255)',
+      },
     };
   }
 

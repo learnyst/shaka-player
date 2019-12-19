@@ -41,11 +41,11 @@
   },
   "SKIP_TO_LIVE": {
     "message": "Skip ahead to live",
-    "description": "Label for a button used to skip ahead to the live edge of a live video stream."
+    "description": "Label for a button used to skip ahead to the live broadcast."
   },
   "LIVE": {
     "message": "Live",
-    "description": "Label to indicate that a video is already playing at the live edge of a live video stream."
+    "description": "Label to indicate that a video is already playing at the live broadcast."
   },
   "MORE_SETTINGS": {
     "message": "More settings",
@@ -120,5 +120,21 @@
   "OFF": {
     "message": "Off",
     "description": "Title beneath a button showing that this feature of the video player is not currently enabled.  Currently used for Cast, Picture-in-Picture, and Captions/Subtitles, but could apply to other features in the future."
+  },
+  "AD_PROGRESS": {
+    "message": "[AD_ON:1] of [NUM_ADS:6]",
+    "description": "The contents of the ad countdown element, describing what ad you are on in a sequence of ads."
+  },
+  "SKIP_AD": {
+    "message": "Skip Ad",
+    "description": "The title of the Skip Ad button, that skips currently playing ad, when clicked."
+  },
+  "AD_DURATION": {
+    "message": "Ad duration",
+    "description": "An aria label for the ad countdown element that shows how long the current ad is going to last."
+  },
+  "AD_TIME": {
+    "message": "Ad: [AD_TIME:0:05/0:10]",
+    "description": "The text content of a label that shows how much time is left in the current ad."
   }
 }

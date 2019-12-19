@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 goog.provide('shaka.test.StreamingEngineUtil');
@@ -272,10 +260,16 @@ shaka.test.StreamingEngineUtil = class {
       for (const type in segmentDurations) {
         const stream =
             shaka.test.StreamingEngineUtil.createMockStream(type, id++);
-        stream.createSegmentIndex.and.returnValue(Promise.resolve());
-        stream.segmentIndex.find.and.callFake(
+
+        const segmentIndex = new shaka.test.FakeSegmentIndex();
+        segmentIndex.find.and.callFake(
             (time) => find(type, i + 1, time));
-        stream.segmentIndex.get.and.callFake((pos) => get(type, i + 1, pos));
+        segmentIndex.get.and.callFake((pos) => get(type, i + 1, pos));
+
+        stream.createSegmentIndex.and.callFake(() => {
+          stream.segmentIndex = segmentIndex;
+          return Promise.resolve();
+        });
 
         const ContentType = shaka.util.ManifestParserUtils.ContentType;
         if (type == ContentType.TEXT) {
@@ -365,7 +359,7 @@ shaka.test.StreamingEngineUtil = class {
     return {
       id: id,
       createSegmentIndex: jasmine.createSpy('createSegmentIndex'),
-      segmentIndex: new shaka.test.FakeSegmentIndex(),
+      segmentIndex: null,
       mimeType: 'audio/mp4',
       codecs: 'mp4a.40.2',
       bandwidth: 192000,
@@ -384,7 +378,7 @@ shaka.test.StreamingEngineUtil = class {
     return {
       id: id,
       createSegmentIndex: jasmine.createSpy('createSegmentIndex'),
-      segmentIndex: new shaka.test.FakeSegmentIndex(),
+      segmentIndex: null,
       mimeType: 'video/mp4',
       codecs: 'avc1.42c01e',
       bandwidth: 5000000,
@@ -405,7 +399,7 @@ shaka.test.StreamingEngineUtil = class {
     return {
       id: id,
       createSegmentIndex: jasmine.createSpy('createSegmentIndex'),
-      segmentIndex: new shaka.test.FakeSegmentIndex(),
+      segmentIndex: null,
       mimeType: 'text/vtt',
       kind: ManifestParserUtils.TextStreamKind.SUBTITLE,
       type: ManifestParserUtils.ContentType.TEXT,

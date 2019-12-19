@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -78,6 +66,12 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
 
     /** @private {!HTMLElement} */
     this.videoContainer_ = videoContainer;
+
+    /** @private {shaka.extern.IAdManager} */
+    this.adManager_ = this.player_.getAdManager();
+
+    /** @private {shaka.extern.IAd} */
+    this.ad_ = null;
 
     /** @private {shaka.ui.SeekBar} */
     this.seekBar_ = null;
@@ -601,7 +595,7 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
   /** @export */
   async toggleFullScreen() {
     if (document.fullscreenElement) {
-      document.exitFullscreen();
+      await document.exitFullscreen();
     } else {
       // If we are in PiP mode, leave PiP mode first.
       try {
@@ -619,18 +613,68 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
 
   /** @export */
   showAdUI() {
-    // TODO
+    // TODO: other ad states (seek bar display etc)
+    shaka.ui.Utils.setDisplay(this.adPanel_, true);
   }
 
   /** @export */
   hideAdUI() {
-    // TODO
+    // TODO: other ad states (seek bar display etc)
+    shaka.ui.Utils.setDisplay(this.adPanel_, false);
   }
+
+  /**
+   * Play or pause the current presentation.
+   */
+  playPausePresentation() {
+    if (!this.enabled_) {
+      return;
+    }
+
+    if (!this.video_.duration) {
+      // Can't play yet.  Ignore.
+      return;
+    }
+
+    this.player_.cancelTrickPlay();
+
+    if (this.presentationIsPaused()) {
+      this.video_.play();
+    } else {
+      this.video_.pause();
+    }
+  }
+
+  /**
+   * Play or pause the current ad.
+   */
+  playPauseAd() {
+    if (this.ad_ && this.ad_.isPaused()) {
+      this.ad_.play();
+    } else if (this.ad_) {
+      this.ad_.pause();
+    }
+  }
+
+
+  /**
+   * Return true if the presentation is paused.
+   *
+   * @return {boolean}
+   */
+  presentationIsPaused() {
+    // The video element is in a paused state while seeking, but we don't count
+    // that.
+    return this.video_.paused && !this.isSeeking();
+  }
+
 
   /** @private */
   createDOM_() {
     this.videoContainer_.classList.add('shaka-video-container');
     this.video_.classList.add('shaka-video');
+
+    this.addSkimContainer_();
 
     if (this.config_.addBigPlayButton) {
       this.addPlayButton_();
@@ -693,6 +737,16 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
   }
 
   /** @private */
+  addSkimContainer_() {
+    // This is the container that gets styled by CSS to have the
+    // black gradient skim at the end of the controls.
+    const skimContainer = shaka.util.Dom.createHTMLElement('div');
+    skimContainer.classList.add('shaka-skim-container');
+    skimContainer.classList.add('shaka-fade-out-on-mouse-out');
+    this.controlsContainer_.appendChild(skimContainer);
+  }
+
+  /** @private */
   addAdContainer_() {
     // Ad container. IMA will use this div to display client-side ads.
     /** @private {!HTMLElement} */
@@ -706,8 +760,11 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
     /** @private {!HTMLElement} */
     this.adPanel_ = shaka.util.Dom.createHTMLElement('div');
     this.adPanel_.classList.add('shaka-ad-controls');
-    this.adPanel_.classList.add('shaka-hidden');
+    shaka.ui.Utils.setDisplay(this.adPanel_, false);
     this.bottomControls_.appendChild(this.adPanel_);
+
+    const adPosition = new shaka.ui.AdPosition(this.adPanel_, this);
+    this.elements_.push(adPosition);
 
     const adCounter = new shaka.ui.AdCounter(this.adPanel_, this);
     this.elements_.push(adCounter);
@@ -853,11 +910,29 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
       this.onKeyUp_(e);
     });
 
+    this.eventManager_.listen(
+        this.adManager_, shaka.ads.AdManager.AD_STARTED, (e) => {
+          this.ad_ = (/** @type {!Object} */ (e))['ad'];
+          this.showAdUI();
+        });
+
+    this.eventManager_.listen(
+        this.adManager_, shaka.ads.AdManager.AD_STOPPED, () => {
+          this.ad_ = null;
+          this.hideAdUI();
+        });
+
     if (screen.orientation) {
-      this.eventManager_.listen(screen.orientation, 'change', () => {
-        this.onScreenRotation_();
+      this.eventManager_.listen(screen.orientation, 'change', async () => {
+        await this.onScreenRotation_();
       });
     }
+
+    this.eventManager_.listen(document, 'fullscreenchange', () => {
+      if (this.ad_) {
+        this.ad_.resize(this.video_.offsetWidth, this.video_.offsetHeight);
+      }
+    });
   }
 
 
@@ -867,17 +942,17 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
    * Similarly, exit fullscreen when the device is rotated to portrait layout.
    * @private
    */
-  onScreenRotation_() {
+  async onScreenRotation_() {
     if (!this.video_ ||
         this.video_.readyState == 0 ||
         this.castProxy_.isCasting()) { return; }
 
     if (screen.orientation.type.includes('landscape') &&
         !document.fullscreenElement) {
-      this.videoContainer_.requestFullscreen();
+      await this.videoContainer_.requestFullscreen();
     } else if (screen.orientation.type.includes('portrait') &&
         document.fullscreenElement) {
-      document.exitFullscreen();
+      await document.exitFullscreen();
     }
   }
 
@@ -966,10 +1041,13 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
     // Hide the cursor.  (NOTE: not supported on IE)
     this.videoContainer_.style.cursor = 'none';
 
-    // Keep showing the controls if video is paused or one of the control menus
-    // is hovered.
-    if ((this.video_.paused && !this.isSeeking_) ||
-         this.overrideCssShowControls_) {
+    const adIsPaused = this.ad_ ? this.ad_.isPaused() : false;
+    const videoIsPaused = this.video_.paused && !this.isSeeking_;
+
+    // Keep showing the controls if ad or video is paused or one of
+    // the control menus is hovered.
+    if (adIsPaused ||
+       (!this.ad_ && videoIsPaused) || this.overrideCssShowControls_) {
       this.setControlsOpacity_(shaka.ui.Enums.Opacity.OPAQUE);
     } else {
       this.setControlsOpacity_(shaka.ui.Enums.Opacity.TRANSPARENT);
@@ -1013,21 +1091,10 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
 
   /** @private */
   onPlayPauseClick_() {
-    if (!this.enabled_) {
-      return;
-    }
-
-    if (!this.video_.duration) {
-      // Can't play yet.  Ignore.
-      return;
-    }
-
-    this.player_.cancelTrickPlay();
-
-    if (this.video_.paused) {
-      this.video_.play();
+    if (this.ad_) {
+      this.playPauseAd();
     } else {
-      this.video_.pause();
+      this.playPausePresentation();
     }
   }
 

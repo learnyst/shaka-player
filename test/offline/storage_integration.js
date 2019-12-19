@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('Storage', () => {
@@ -127,12 +115,14 @@ describe('Storage', () => {
       await player.destroy();
     });
 
-    // TODO: Still failing in Chrome canary 73 on 2018-12-12.
-    // Some combination of these bugs is preventing this test from working:
-    //   http://crbug.com/690583
-    //   http://crbug.com/887535
-    //   http://crbug.com/887635
-    //   http://crbug.com/883895
+    // TODO: Make a test to ensure that setting delayLicenseRequestUntilPlayed
+    // to true doesn't break storage, once we have working tests for storing DRM
+    // content.
+    // See issue #2218.
+
+    // Quarantined due to http://crbug.com/1019298 where a load cannot happen
+    // immediately after a remove.  This can sometimes be fixed with a delay,
+    // but it is extremely flaky, so these are disabled until the bug is fixed.
     quarantinedIt('removes persistent license', async () => {
       const TestManifestParser = shaka.test.TestScheme.ManifestParser;
 
@@ -150,44 +140,24 @@ describe('Storage', () => {
       expect(manifest.offlineSessionIds).toBeTruthy();
       expect(manifest.offlineSessionIds.length).toBeTruthy();
 
-      // Work around http://crbug.com/887535 in which load cannot happen
-      // right after close.  Experimentally, we seem to need a ~1s delay, so
-      // we're using a 3s delay to ensure it doesn't flake.  Without this,
-      // we get error 6005 (FAILED_TO_CREATE_SESSION) with system code 70.
-      // TODO: Remove when Chrome is fixed
-      await shaka.test.Util.delay(3);
-
       // PART 2 - Check that the licences are stored.
       await withDrm(player, manifest, (drm) => {
-        return Promise.all(
-            manifest.offlineSessionIds.map(async (session) => {
-              const foundSession = await loadOfflineSession(drm, session);
-              expect(foundSession).toBeTruthy();
-            }));
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const foundSession = await loadOfflineSession(drm, session);
+          expect(foundSession).toBeTruthy();
+        }));
       });
 
       // PART 3 - Remove the manifest from storage. This should remove all
       // the sessions.
       await storage.remove(uri.toString());
 
-      // Work around http://crbug.com/887535 in which load cannot happen
-      // right after close.  Experimentally, we seem to need a ~1s delay, so
-      // we're using a 3s delay to ensure it doesn't flake.  Without this,
-      // we get error 6005 (FAILED_TO_CREATE_SESSION) with system code 70.
-      // TODO: Remove when Chrome is fixed
-      await shaka.test.Util.delay(3);
-
       // PART 4 - Check that the licenses were removed.
       const p = withDrm(player, manifest, (drm) => {
-        return Promise.all(
-            manifest.offlineSessionIds.map(async (session) => {
-              const notFoundSession =
-                  await loadOfflineSession(drm, session);
-              // TODO: This is failing.  The session is actually found,
-              // possibly due to http://crbug.com/690583, but this is
-              // unclear.
-              expect(notFoundSession).toBeFalsy();
-            }));
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const notFoundSession = await loadOfflineSession(drm, session);
+          expect(notFoundSession).toBeFalsy();
+        }));
       });
       const expected = Util.jasmineError(new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
@@ -196,30 +166,8 @@ describe('Storage', () => {
       await expectAsync(p).toBeRejectedWith(expected);
     });
 
-    // TODO: Still failing in Chrome canary 73 on 2018-12-12.
-    // Some combination of these bugs is preventing this test from working:
-    //   http://crbug.com/690583
-    //   http://crbug.com/887535
-    //   http://crbug.com/887635
-    //   http://crbug.com/883895
     quarantinedIt('defers removing licenses on error', async () => {
       const TestManifestParser = shaka.test.TestScheme.ManifestParser;
-      const getEmeSessions = async () => {
-        /** @type {!shaka.offline.StorageMuxer} */
-        const muxer = new shaka.offline.StorageMuxer();
-        await muxer.init();
-
-        /** @type {!Array.<!Promise>} */
-        const promises = [];
-        muxer.forEachEmeSessionCell((cell) => promises.push(cell.getAll()));
-        const cellByMechanism = await Promise.all(promises);
-        await muxer.destroy();
-        return cellByMechanism.reduce(
-            shaka.util.Functional.collapseArrays, []);
-      };
-
-      const oldSessions = await getEmeSessions();
-      expect(oldSessions).toEqual([]);
 
       // PART 1 - Download and store content that has a persistent license
       //          associated with it.
@@ -249,18 +197,12 @@ describe('Storage', () => {
       const storedContents = await storage.list();
       expect(storedContents).toEqual([]);
 
-      // TODO: Chrome has a bug that prevents loading the session a second
-      // time, so we can't check EME for the session.  Instead, check the
-      // database. This can be changed when http://crbug.com/887635 is
-      // fixed.
-      // TODO: Whether checking the database or loading the EME session,
-      // this will fail because of another Chrome bug.  Calling remove()
-      // causes the session to be removed without waiting for update.  So
-      // this entire feature is non-functional on Chrome.  The test can
-      // probably be made to pass once https://crbug.com/883895 is fixed,
-      // possibly after using a delay to work around http://crbug.com/887535
-      const sessions = await getEmeSessions();
-      expect(sessions.length).toBeGreaterThan(0);
+      await withDrm(player, manifest, (drm) => {
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const foundSession = await loadOfflineSession(drm, session);
+          expect(foundSession).toBeTruthy();
+        }));
+      });
 
       // PART 5 - Disable the error and remove the EME session.
       storage.getNetworkingEngine().clearAllRequestFilters();
@@ -268,15 +210,11 @@ describe('Storage', () => {
       expect(didRemoveAll).toBe(true);
 
       // PART 6 - Check that the licenses were removed.
-      const endSessions = await getEmeSessions();
-      expect(endSessions).toEqual([]);
       const p = withDrm(player, manifest, (drm) => {
-        return Promise.all(
-            manifest.offlineSessionIds.map(async (session) => {
-              const notFoundSession =
-                  await loadOfflineSession(drm, session);
-              expect(notFoundSession).toBeFalsy();
-            }));
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const notFoundSession = await loadOfflineSession(drm, session);
+          expect(notFoundSession).toBeFalsy();
+        }));
       });
       const expected = Util.jasmineError(new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
@@ -948,30 +886,6 @@ describe('Storage', () => {
           .toBeRejectedWith(expected);
     });
 
-    it('throws an error if DRM sessions are not ready', async () => {
-      const drmInfo = makeDrmInfo();
-      const noSessions = [];
-
-      // TODO(vaage): Is there a way we can set the session ids without
-      //              needing to overload an internal call in storage.
-      const drm = new shaka.test.FakeDrmEngine();
-      drm.setDrmInfo(drmInfo);
-      drm.setSessionIds(noSessions);
-
-      overrideDrmAndManifest(
-          storage,
-          drm,
-          makeManifestWithPerStreamBandwidth());
-
-      const expected = Util.jasmineError(new shaka.util.Error(
-          shaka.util.Error.Severity.CRITICAL,
-          shaka.util.Error.Category.STORAGE,
-          shaka.util.Error.Code.NO_INIT_DATA_FOR_OFFLINE,
-          manifestWithPerStreamBandwidthUri));
-      await expectAsync(storage.store(manifestWithPerStreamBandwidthUri))
-          .toBeRejectedWith(expected);
-    });
-
     it('throws an error if destroyed mid-store', async () => {
       const manifest = makeManifestWithPerStreamBandwidth();
 
@@ -1191,6 +1105,7 @@ describe('Storage', () => {
       videoId: videoId,
       audioId: audioId,
       channelsCount: 2,
+      audioSamplingRate: 48000,
       audioBandwidth: bandwidth * 0.33,
       videoBandwidth: bandwidth * 0.67,
       originalVideoId: videoId.toString(),
@@ -1226,6 +1141,7 @@ describe('Storage', () => {
       videoId: null,
       audioId: null,
       channelsCount: null,
+      audioSamplingRate: null,
       audioBandwidth: null,
       videoBandwidth: null,
       originalVideoId: null,

@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('TtmlTextParser', () => {
@@ -85,11 +73,13 @@ describe('TtmlTextParser', () => {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     // Any other value is rejected as an error.
     errorHelper(shaka.util.Error.Code.INVALID_XML,
-        '<tt xml:space="invalid">' + ttBody + '</tt>');
+        '<tt xml:space="invalid">' + ttBody + '</tt>',
+        jasmine.any(String));
   });
 
   it('rejects invalid ttml', () => {
-    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>');
+    const anyString = jasmine.any(String);
+    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>', anyString);
   });
 
   it('rejects invalid time format', () => {
@@ -954,11 +944,20 @@ describe('TtmlTextParser', () => {
   /**
    * @param {shaka.util.Error.Code} code
    * @param {string} text
+   * @param {*=} errorData
    */
-  function errorHelper(code, text) {
-    const error = shaka.test.Util.jasmineError(new shaka.util.Error(
-        shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
-        code));
+  function errorHelper(code, text, errorData = undefined) {
+    let shakaError;
+    if (errorData) {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code, errorData);
+    } else {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code);
+    }
+    const error = shaka.test.Util.jasmineError(shakaError);
     const data = shaka.util.StringUtils.toUTF8(text);
     expect(() => {
       new shaka.text.TtmlTextParser().parseMedia(

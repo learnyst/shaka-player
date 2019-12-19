@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('Pssh', () => {
@@ -228,23 +216,10 @@ describe('Pssh', () => {
 
     const pssh = new shaka.util.Pssh(psshData);
 
-    expect(pssh.dataBoundaries.length).toBe(3);
-
-    const data1 = psshData.subarray(
-        pssh.dataBoundaries[0].start,
-        pssh.dataBoundaries[0].end + 1);
-
-    const data2 = psshData.subarray(
-        pssh.dataBoundaries[1].start,
-        pssh.dataBoundaries[1].end + 1);
-
-    const data3 = psshData.subarray(
-        pssh.dataBoundaries[2].start,
-        pssh.dataBoundaries[2].end + 1);
-
-    expect(toHex(data1)).toBe(GENERIC_PSSH);
-    expect(toHex(data2)).toBe(WIDEVINE_PSSH);
-    expect(toHex(data3)).toBe(PLAYREADY_PSSH);
+    expect(pssh.data.length).toBe(3);
+    expect(toHex(pssh.data[0])).toBe(GENERIC_PSSH);
+    expect(toHex(pssh.data[1])).toBe(WIDEVINE_PSSH);
+    expect(toHex(pssh.data[2])).toBe(PLAYREADY_PSSH);
   });
 });
 

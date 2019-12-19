@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -47,6 +35,9 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
           'shaka-no-propagation',
           'shaka-show-controls-on-mouse-over',
         ]);
+
+    /** @private {!shaka.extern.UIConfiguration} */
+    this.config_ = this.controls.getConfig();
 
     /**
      * This timer is used to introduce a delay between the user scrubbing across
@@ -145,8 +136,7 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
    * Also called internally when the user interacts with the input element.
    */
   update() {
-    const Constants = shaka.ui.Constants;
-
+    const colors = this.config_.seekBarColors;
     const currentTime = this.getValue();
     const bufferedLength = this.video.buffered.length;
     const bufferedStart = bufferedLength ? this.video.buffered.start(0) : 0;
@@ -160,13 +150,13 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
 
     // Hide seekbar if the seek window is very small.
     if (this.player.isLive() &&
-        seekRangeSize < Constants.MIN_SEEK_WINDOW_TO_SHOW_SEEKBAR) {
+        seekRangeSize < shaka.ui.Constants.MIN_SEEK_WINDOW_TO_SHOW_SEEKBAR) {
       shaka.ui.Utils.setDisplay(this.container, false);
     } else {
       shaka.ui.Utils.setDisplay(this.container, true);
 
       if (bufferedLength == 0) {
-        this.container.style.background = Constants.SEEK_BAR_BASE_COLOR;
+        this.container.style.background = colors.base;
       } else {
         const clampedBufferStart = Math.max(bufferedStart, seekRange.start);
         const clampedBufferEnd = Math.min(bufferedEnd, seekRange.end);
@@ -186,12 +176,12 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
         const makeColor = (color, fract) => color + ' ' + (fract * 100) + '%';
         const gradient = [
           'to right',
-          makeColor(Constants.SEEK_BAR_BASE_COLOR, bufferStartFraction),
-          makeColor(Constants.SEEK_BAR_PLAYED_COLOR, bufferStartFraction),
-          makeColor(Constants.SEEK_BAR_PLAYED_COLOR, playheadFraction),
-          makeColor(Constants.SEEK_BAR_BUFFERED_COLOR, playheadFraction),
-          makeColor(Constants.SEEK_BAR_BUFFERED_COLOR, bufferEndFraction),
-          makeColor(Constants.SEEK_BAR_BASE_COLOR, bufferEndFraction),
+          makeColor(colors.base, bufferStartFraction),
+          makeColor(colors.played, bufferStartFraction),
+          makeColor(colors.played, playheadFraction),
+          makeColor(colors.buffered, playheadFraction),
+          makeColor(colors.buffered, bufferEndFraction),
+          makeColor(colors.base, bufferEndFraction),
         ];
         this.container.style.background =
             'linear-gradient(' + gradient.join(',') + ')';

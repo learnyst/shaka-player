@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 
@@ -67,6 +55,28 @@ shaka.ui.Element = class {
      * @exportInterface
      */
     this.video = this.controls.getVideo();
+
+    /**
+     * @protected {shaka.extern.IAdManager}
+     * @exportInterface
+     */
+    this.adManager = this.player.getAdManager();
+
+    /**
+     * @protected {shaka.extern.IAd}
+     * @exportInterface
+     */
+    this.ad = null;
+
+    const AD_STARTED = shaka.ads.AdManager.AD_STARTED;
+    this.eventManager.listen(this.adManager, AD_STARTED, (e) => {
+      this.ad = (/** @type {!Object} */ (e))['ad'];
+    });
+
+    const AD_STOPPED = shaka.ads.AdManager.AD_STOPPED;
+    this.eventManager.listen(this.adManager, AD_STOPPED, () => {
+      this.ad = null;
+    });
   }
 
   /**
@@ -82,5 +92,7 @@ shaka.ui.Element = class {
     this.localization = null;
     this.player = null;
     this.video = null;
+    this.adManager = null;
+    this.ad = null;
   }
 };

@@ -1,18 +1,6 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('Player', () => {
@@ -926,6 +914,7 @@ describe('Player', () => {
               stream.originalId = 'audio-en-6c';
               stream.bandwidth = 300;
               stream.channelsCount = 6;
+              stream.audioSamplingRate = 48000;
               stream.roles = ['main'];
             });
           });
@@ -948,6 +937,7 @@ describe('Player', () => {
               stream.originalId = 'audio-en-2c';
               stream.bandwidth = 100;
               stream.channelsCount = 2;
+              stream.audioSamplingRate = 48000;
               stream.roles = ['main'];
             });
           });
@@ -965,6 +955,7 @@ describe('Player', () => {
               stream.originalId = 'audio-commentary';
               stream.bandwidth = 100;
               stream.channelsCount = 2;
+              stream.audioSamplingRate = 48000;
               stream.roles = ['commentary'];
             });
           });
@@ -982,6 +973,7 @@ describe('Player', () => {
               stream.originalId = 'audio-es';
               stream.bandwidth = 100;
               stream.channelsCount = 2;
+              stream.audioSamplingRate = 48000;
             });
           });
           period.addVariant(107, (variant) => {  // spanish stereo, high res
@@ -1030,6 +1022,7 @@ describe('Player', () => {
             variant.addAudio(11, (stream) => {
               stream.bandwidth = 100;
               stream.channelsCount = 2;
+              stream.audioSamplingRate = 48000;
             });
           });
           period.addVariant(201, (variant) => {
@@ -1039,6 +1032,7 @@ describe('Player', () => {
             variant.addAudio(12, (stream) => {
               stream.bandwidth = 300;
               stream.channelsCount = 6;
+              stream.audioSamplingRate = 48000;
             });
           });
         });
@@ -1066,6 +1060,7 @@ describe('Player', () => {
           videoId: 1,
           audioId: 3,
           channelsCount: 6,
+          audioSamplingRate: 48000,
           audioBandwidth: 300,
           videoBandwidth: 1000,
           originalAudioId: 'audio-en-6c',
@@ -1093,6 +1088,7 @@ describe('Player', () => {
           videoId: 2,
           audioId: 3,
           channelsCount: 6,
+          audioSamplingRate: 48000,
           audioBandwidth: 300,
           videoBandwidth: 2000,
           originalAudioId: 'audio-en-6c',
@@ -1120,6 +1116,7 @@ describe('Player', () => {
           videoId: 1,
           audioId: 4,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-en-2c',
@@ -1147,6 +1144,7 @@ describe('Player', () => {
           videoId: 2,
           audioId: 4,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-en-2c',
@@ -1174,6 +1172,7 @@ describe('Player', () => {
           videoId: 1,
           audioId: 5,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-commentary',
@@ -1201,6 +1200,7 @@ describe('Player', () => {
           videoId: 2,
           audioId: 5,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-commentary',
@@ -1228,6 +1228,7 @@ describe('Player', () => {
           videoId: 1,
           audioId: 6,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-es',
@@ -1255,6 +1256,7 @@ describe('Player', () => {
           videoId: 2,
           audioId: 6,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-es',
@@ -1279,6 +1281,7 @@ describe('Player', () => {
           roles: [],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
@@ -1306,6 +1309,7 @@ describe('Player', () => {
           roles: ['main'],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
@@ -1333,6 +1337,7 @@ describe('Player', () => {
           roles: ['commentary'],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
@@ -3005,6 +3010,7 @@ describe('Player', () => {
             variant.bandwidth = 300;
             variant.addAudio(0, (stream) => {
               stream.channelsCount = 6;
+              stream.audioSamplingRate = 48000;
               stream.codecs = 'ac-3';
             });
           });
@@ -3013,6 +3019,7 @@ describe('Player', () => {
             variant.bandwidth = 100;
             variant.addAudio(1, (stream) => {
               stream.channelsCount = 2;
+              stream.audioSamplingRate = 48000;
               stream.codecs = 'mp4a.40.2';
             });
           });

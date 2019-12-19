@@ -42,6 +42,16 @@ def _Check(name):
     return func
   return decorator
 
+def complete_build_files():
+  """Returns a complete set of build files."""
+  complete = build.Build()
+  # Normally we don't need to include @core, but because we look at the build
+  # object directly, we need to include it here.  When using main(), it will
+  # call addCore which will ensure core is included.
+  if not complete.parse_build(['+@complete', '+@core'], os.getcwd()):
+    logging.error('Error parsing complete build')
+    return False
+  return complete.include
 
 def get_lint_files():
   """Returns the absolute paths to all the files to run the linter over."""
@@ -117,12 +127,8 @@ def check_complete(_):
   """
   logging.info('Checking that the build files are complete...')
 
-  complete = build.Build()
-  # Normally we don't need to include @core, but because we look at the build
-  # object directly, we need to include it here.  When using main(), it will
-  # call addCore which will ensure core is included.
-  if not complete.parse_build(['+@complete', '+@core'], os.getcwd()):
-    logging.error('Error parsing complete build')
+  complete_build = complete_build_files()
+  if not complete_build:
     return False
 
   match = re.compile(r'.*\.js$')
@@ -132,7 +138,7 @@ def check_complete(_):
       os.path.join(base, 'lib'), match))
   all_files.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'ui'), match))
-  missing_files = all_files - complete.include
+  missing_files = all_files - complete_build
 
   if missing_files:
     logging.error('There are files missing from the complete build:')
@@ -148,26 +154,24 @@ def check_spelling(_):
   """Checks that source files don't have any common misspellings."""
   logging.info('Checking for common misspellings...')
 
-  complete = build.Build()
-  # Normally we don't need to include @core, but because we look at the build
-  # object directly, we need to include it here.  When using main(), it will
-  # call addCore which will ensure core is included.
-  if not complete.parse_build(['+@complete', '+@core'], os.getcwd()):
-    logging.error('Error parsing complete build')
+  complete_build = complete_build_files()
+  if not complete_build:
     return False
+
   base = shakaBuildHelpers.get_source_base()
-  complete.include.update(shakaBuildHelpers.get_all_files(
+  complete_build.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'test'), re.compile(r'.*\.js$')))
-  complete.include.update(shakaBuildHelpers.get_all_files(
+  complete_build.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'demo'), re.compile(r'.*\.js$')))
-  complete.include.update(shakaBuildHelpers.get_all_files(
+  complete_build.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'build'), re.compile(r'.*\.(js|py)$')))
 
-  with open(os.path.join(base, 'build', 'misspellings.txt')) as f:
+  with shakaBuildHelpers.open_file(
+      os.path.join(base, 'build', 'misspellings.txt')) as f:
     misspellings = ast.literal_eval(f.read())
   has_error = False
-  for path in complete.include:
-    with open(path) as f:
+  for path in complete_build:
+    with shakaBuildHelpers.open_file(path) as f:
       for i, line in enumerate(f):
         for regex, replace_pattern in misspellings.items():
           for match in re.finditer(regex, line):
@@ -198,25 +202,22 @@ def check_eslint_disable(_):
   """
   logging.info('Checking correct usage of eslint-disable...')
 
-  complete = build.Build()
-  # Normally we don't need to include @core, but because we look at the build
-  # object directly, we need to include it here.  When using main(), it will
-  # call addCore which will ensure core is included.
-  if not complete.parse_build(['+@complete', '+@core'], os.getcwd()):
-    logging.error('Error parsing complete build')
+  complete_build = complete_build_files()
+  if not complete_build:
     return False
+
   base = shakaBuildHelpers.get_source_base()
-  complete.include.update(shakaBuildHelpers.get_all_files(
+  complete_build.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'test'), re.compile(r'.*\.js$')))
-  complete.include.update(shakaBuildHelpers.get_all_files(
+  complete_build.update(shakaBuildHelpers.get_all_files(
       os.path.join(base, 'demo'), re.compile(r'.*\.js$')))
 
   has_error = False
-  for path in complete.include:
+  for path in complete_build:
     # The stack of rules that are disabled.
     disabled = []
 
-    with open(path, 'r') as f:
+    with shakaBuildHelpers.open_file(path, 'r') as f:
       rel_path = os.path.relpath(path, base)
       for i, line in enumerate(f):
         match = re.match(r'^\s*/\* eslint-(disable|enable) ([\w-]*) \*/$', line)
@@ -268,16 +269,22 @@ def check_tests(args):
   """
   logging.info('Checking the tests for type errors...')
 
+  complete_build = complete_build_files()
+  if not complete_build:
+    return False
+
   match = re.compile(r'.*\.js$')
   base = shakaBuildHelpers.get_source_base()
   def get(*path_components):
     return shakaBuildHelpers.get_all_files(
         os.path.join(base, *path_components), match)
-  files = set(get('lib') + get('externs') + get('test') + get('ui') +
-              get('third_party', 'closure') +
-              get('third_party', 'language-mapping-list'))
+
+  files = complete_build
+  files.update(set(get('externs') + get('test') +
+                   get('third_party', 'closure')))
   files.add(os.path.join(base, 'demo', 'common', 'asset.js'))
   files.add(os.path.join(base, 'demo', 'common', 'assets.js'))
+  files.add(os.path.join(base, 'demo', 'common', 'message_ids.js'))
 
   localizations = compiler.GenerateLocalizations(None)
   localizations.generate(args.force)
