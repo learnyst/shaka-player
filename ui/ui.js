@@ -98,7 +98,7 @@ shaka.ui.Overlay = class {
     const ret = this.defaultConfig_();
     shaka.util.ConfigUtils.mergeConfigObjects(
         ret, this.config_, this.defaultConfig_(),
-        /* overrides (only used for player config)*/ {}, /* path */ '');
+        /* overrides= */ {}, /* path= */ '');
     return ret;
   }
 
@@ -124,7 +124,7 @@ shaka.ui.Overlay = class {
 
     shaka.util.ConfigUtils.mergeConfigObjects(
         this.config_, config, this.defaultConfig_(),
-        /* overrides (only used for player config)*/ {}, /* path */ '');
+        /* overrides= */ {}, /* path= */ '');
 
     // If a cast receiver app id has been given, add a cast button to the UI
     if (this.config_.castReceiverAppId &&
@@ -180,8 +180,9 @@ shaka.ui.Overlay = class {
    * @private
    */
   defaultConfig_() {
-    return {
+    const config = {
       controlPanelElements: [
+        'play_pause',
         'time_and_duration',
         'spacer',
         'mute',
@@ -197,7 +198,7 @@ shaka.ui.Overlay = class {
         'cast',
       ],
       addSeekBar: true,
-      addBigPlayButton: true,
+      addBigPlayButton: false,
       castReceiverAppId: '',
       clearBufferOnQualityChange: true,
       seekBarColors: {
@@ -209,9 +210,21 @@ shaka.ui.Overlay = class {
         base: 'rgba(255, 255, 255, 0.54)',
         level: 'rgb(255, 255, 255)',
       },
+      trackLabelFormat: shaka.ui.TrackLabelFormat.LANGUAGE,
+      fadeDelay: 0,
     };
-  }
 
+    // On mobile, by default, hide the volume slide and the small play/pause
+    // button and show the big play/pause button in the center.
+    // This is in line with default styles in Chrome.
+    if (this.isMobile()) {
+      config.addBigPlayButton = true;
+      config.controlPanelElements = config.controlPanelElements.filter(
+          (name) => name != 'play_pause' && name != 'volume');
+    }
+
+    return config;
+  }
 
   /**
    * @private
@@ -375,6 +388,19 @@ shaka.ui.Overlay = class {
       }
     }
   }
+};
+
+/**
+ * Describes what information should show up in labels for selecting audio
+ * variants and text tracks.
+ *
+ * @enum {number}
+ * @export
+ */
+shaka.ui.TrackLabelFormat = {
+  'LANGUAGE': 0,
+  'ROLE': 1,
+  'LANGUAGE_ROLE': 2,
 };
 
 if (document.readyState == 'complete') {

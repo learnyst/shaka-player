@@ -101,6 +101,10 @@ shakaDemo.Main = class {
                  'platform-and-browser-support-matrix';
     this.handleError_(severity, message, href);
 
+    const errorCloseButton =
+        document.getElementById('error-display-close-button');
+    errorCloseButton.style.display = 'none';
+
     // Update the componentHandler, to account for any new MDL elements added.
     componentHandler.upgradeDom();
 
@@ -137,13 +141,10 @@ shakaDemo.Main = class {
 
     if (navigator.serviceWorker) {
       console.debug('Registering service worker.');
-      try {
-        const registration =
-            await navigator.serviceWorker.register('service_worker.js');
-        console.debug('Service worker registered!', registration.scope);
-      } catch (error) {
-        console.error('Service worker registration failed!', error);
-      }
+      // NOTE: This can sometimes hang on iOS 12, so let's not wait for it to
+      // complete before setting up the app.  We don't even use the Promise
+      // result or react to the registration failure except to log it.
+      navigator.serviceWorker.register('service_worker.js');
     }
 
     // Optionally enter noinput mode. This has to happen before setting up the
@@ -689,20 +690,15 @@ shakaDemo.Main = class {
     const localization = this.controls_.getLocalization();
     const load = async (urlBase) => {
       const url = urlBase + '/locales/' + locale + '.json';
-      const response = await fetch(url);
-      if (!response.ok) {
+
+      try {
+        const text = await this.loadText_(url);
+        const obj = /** @type {!Object.<string, string>} */(JSON.parse(text));
+        const map = new Map(Object.entries(obj));
+        localization.insert(locale, map);
+      } catch (error) {
         console.warn('Unable to load locale', locale, 'for url', url);
-        return;
       }
-
-      // eslint-disable-next-line no-await-in-loop
-      const obj = await response.json();
-      const map = new Map();
-      for (const key in obj) {
-        map.set(key, obj[key]);
-      }
-
-      localization.insert(locale, map);
     };
     await Promise.all([load('../ui'), load('../demo')]);
   }
@@ -1123,6 +1119,25 @@ shakaDemo.Main = class {
       await this.player_.load(manifestUri);
       if (this.player_.isAudioOnly()) {
         this.video_.poster = shakaDemo.Main.audioOnlyPoster_;
+      }
+
+      // If the asset has an ad tag attached to it, load the ads
+      const adManager = this.player_.getAdManager();
+      if (adManager && asset.adTagUri) {
+        try {
+          // If IMA is blocked by an AdBlocker, init() will throw.
+          // If that happens, just proceed to load.
+          goog.asserts.assert(this.video_ != null, 'this.video should exist!');
+          adManager.initClientSide(
+              this.controls_.getAdContainer(), this.video_);
+          const adRequest = new google.ima.AdsRequest();
+          adRequest.adTagUrl = asset.adTagUri;
+          adManager.requestClientSideAds(adRequest);
+        } catch (error) {
+          console.log(error);
+          console.warn('Ads code has been prevented from running. ' +
+            'Proceeding with the load without ads.');
+        }
       }
 
       // Set media session title, but only if the browser supports that API.

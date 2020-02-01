@@ -909,6 +909,8 @@ describe('Player', () => {
               stream.width = 100;
               stream.height = 200;
               stream.frameRate = 1000000 / 42000;
+              stream.pixelAspectRatio = '59:54';
+              stream.roles = ['main'];
             });
             variant.addAudio(3, (stream) => {
               stream.originalId = 'audio-en-6c';
@@ -925,6 +927,7 @@ describe('Player', () => {
               stream.originalId = 'video-2kbps';
               stream.bandwidth = 2000;
               stream.frameRate = 24;
+              stream.pixelAspectRatio = '59:54';
               stream.size(200, 400);
             });
             variant.addExistingStream(3);  // audio
@@ -1050,6 +1053,7 @@ describe('Player', () => {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1078,6 +1082,7 @@ describe('Player', () => {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1106,6 +1111,7 @@ describe('Player', () => {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1134,6 +1140,7 @@ describe('Player', () => {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1162,12 +1169,13 @@ describe('Player', () => {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
           videoCodec: 'avc1.4d401f',
           primary: false,
-          roles: ['commentary'],
+          roles: ['commentary', 'main'],
           audioRoles: ['commentary'],
           videoId: 1,
           audioId: 5,
@@ -1190,6 +1198,7 @@ describe('Player', () => {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1218,12 +1227,13 @@ describe('Player', () => {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
           videoCodec: 'avc1.4d401f',
           primary: false,
-          roles: [],
+          roles: ['main'],
           audioRoles: [],
           videoId: 1,
           audioId: 6,
@@ -1246,6 +1256,7 @@ describe('Player', () => {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1288,6 +1299,7 @@ describe('Player', () => {
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1316,6 +1328,7 @@ describe('Player', () => {
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1344,6 +1357,7 @@ describe('Player', () => {
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1531,6 +1545,23 @@ describe('Player', () => {
       expect(args[0].audio.roles).toContain('commentary');
       expect(args[1]).toBe(true);
       expect(getActiveVariantTrack().roles).toContain('commentary');
+    });
+
+    it('selectAudioLanguage() applies role only to audio', () => {
+      streamingEngine.onCanSwitch();
+      expect(getActiveVariantTrack().roles).not.toContain('commentary');
+      player.selectAudioLanguage('en', 'commentary');
+      let args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].audio.roles).toContain('commentary');
+      expect(args[0].video.roles).toContain('main');
+
+      // Switch audio role from 'commentary' to 'main'.
+      streamingEngine.switchVariant.calls.reset();
+      player.selectAudioLanguage('en', 'main');
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].audio.roles).toContain('main');
+      expect(args[0].video.roles).toContain('main');
     });
 
     it('selectAudioLanguage() does not change selected text track', () => {
@@ -1924,10 +1955,11 @@ describe('Player', () => {
       let stats = player.getStats();
       expect(stats.decodedFrames).toBeNaN();
       expect(stats.droppedFrames).toBeNaN();
+      expect(stats.corruptedFrames).toBeNaN();
 
       video.getVideoPlaybackQuality = () => {
         return {
-          corruptedVideoFrames: 0,
+          corruptedVideoFrames: 10,
           creationTime: 0,
           totalFrameDelay: 0,
           totalVideoFrames: 75,
@@ -1939,6 +1971,7 @@ describe('Player', () => {
       stats = player.getStats();
       expect(stats.decodedFrames).toBe(75);
       expect(stats.droppedFrames).toBe(125);
+      expect(stats.corruptedFrames).toBe(10);
     });
 
     describe('buffer/play times', () => {
@@ -3237,7 +3270,7 @@ describe('Player', () => {
       };
 
       await player.load(
-          fakeManifestUri, /* startTime */ 0, returnManifest(manifest));
+          fakeManifestUri, /* startTime= */ 0, returnManifest(manifest));
 
       // Ensure this is seen as a live stream, or else the test is invalid.
       expect(player.isLive()).toBe(true);
