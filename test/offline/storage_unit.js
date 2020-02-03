@@ -1381,7 +1381,7 @@ describe('Storage', function() {
    * @suppress {accessControls}
    */
   function loadOfflineSession(drmEngine, sessionName) {
-    return drmEngine.loadOfflineSession_(sessionName);
+    return drmEngine.loadOfflineSession_(sessionName, null);
   }
 
   /**
