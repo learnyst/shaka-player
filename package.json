@@ -10,6 +10,9 @@
       "email": "joeyparrish@google.com"
     }
   ],
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com/"
+  },
   "devDependencies": {
     "awesomplete": "^1.1.4",
     "babel-core": "^6.26.3",
