@@ -4,3 +4,10 @@
 *.pyc
 docs/api/
 coverage/
+build/
+demo/
+externs/
+lib/
+test/
+third_party/
+ui/
