@@ -60,20 +60,20 @@ def main(_):
   elif 'unknown' in git:
     logging.error('Git version is not a tag.')
     ret = 1
-  elif not re.match(r'^v[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9]+)?$', git):
+  elif not re.match(r'^lstv[0-9]+\.[0-9]+\.[0-9]+(?:-[a-z0-9]+)?$', git):
     logging.error('Git version is a malformed release version.')
     logging.error('It should be a \'v\', followed by three numbers')
     logging.error('separated by dots, optionally followed by a hyphen')
     logging.error('and a pre-release identifier.  See http://semver.org/')
     ret = 1
 
-  if 'v' + npm != git:
+  if 'lstv' + npm != git:
     logging.error('NPM version does not match git version.')
     ret = 1
-  if player != git + '-uncompiled':
+  if 'lst' + player != git + '-uncompiled':
     logging.error('Player version does not match git version.')
     ret = 1
-  if 'v' + changelog != git:
+  if 'lstv' + changelog != git:
     logging.error('Changelog version does not match git version.')
     ret = 1
 
