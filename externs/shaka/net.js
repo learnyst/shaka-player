@@ -101,6 +101,7 @@ shaka.extern.Request;
  * @typedef {{
  *   uri: string,
  *   data: ArrayBuffer,
+ *   licenseExpiryDate: (string|undefined),
  *   headers: !Object.<string, string>,
  *   timeMs: (number|undefined),
  *   fromCache: (boolean|undefined)
