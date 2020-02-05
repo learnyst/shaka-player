@@ -70,12 +70,12 @@ def main(_):
   if 'lstv' + npm != git:
     logging.error('NPM version does not match git version.')
     ret = 1
-  if 'lst' + player != git + '-uncompiled':
-    logging.error('Player version does not match git version.')
-    ret = 1
-  if 'lstv' + changelog != git:
-    logging.error('Changelog version does not match git version.')
-    ret = 1
+  # if 'lst' + player != git + '-uncompiled':
+  #   logging.error('Player version does not match git version.')
+  #   ret = 1
+  # if 'lstv' + changelog != git:
+  #   logging.error('Changelog version does not match git version.')
+  #   ret = 1
 
   return ret
 
