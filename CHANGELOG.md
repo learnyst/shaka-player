@@ -1,4 +1,4 @@
-## 3.0.211 (2020-07-28)
+## 3.0.212 (2020-07-28)
 
 Bugfixes:
   - Fix missing build/types/core in npm packages
