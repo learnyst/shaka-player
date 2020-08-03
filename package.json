@@ -1,7 +1,7 @@
 {
   "name": "shaka-player",
   "description": "DASH/EME video player library",
-  "version": "3.0.206",
+  "version": "3.0.207",
   "homepage": "https://github.com/google/shaka-player",
   "author": "Google",
   "maintainers": [
