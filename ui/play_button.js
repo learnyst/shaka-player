@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -26,8 +27,8 @@ shaka.ui.PlayButton = class extends shaka.ui.Element {
 
     const AdManager = shaka.ads.AdManager;
 
-    /** @protected {!HTMLElement} */
-    this.button = shaka.util.Dom.createHTMLElement('button');
+    /** @protected {!HTMLButtonElement} */
+    this.button = shaka.util.Dom.createButton();
     this.parent.appendChild(this.button);
 
     const LOCALE_UPDATED = shaka.ui.Localization.LOCALE_UPDATED;

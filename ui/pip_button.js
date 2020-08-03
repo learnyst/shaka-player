@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -31,13 +32,13 @@ shaka.ui.PipButton = class extends shaka.ui.Element {
     this.localVideo_ = this.controls.getLocalVideo();
 
     const LocIds = shaka.ui.Locales.Ids;
-    /** @private {!HTMLElement} */
-    this.pipButton_ = shaka.util.Dom.createHTMLElement('button');
+    /** @private {!HTMLButtonElement} */
+    this.pipButton_ = shaka.util.Dom.createButton();
     this.pipButton_.classList.add('shaka-pip-button');
 
     /** @private {!HTMLElement} */
     this.pipIcon_ = shaka.util.Dom.createHTMLElement('i');
-    this.pipIcon_.classList.add('material-icons');
+    this.pipIcon_.classList.add('material-icons-round');
     this.pipIcon_.textContent = shaka.ui.Enums.MaterialDesignIcons.PIP;
     this.pipButton_.appendChild(this.pipIcon_);
 

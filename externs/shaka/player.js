@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -76,6 +77,9 @@ shaka.extern.StateChange;
  *   pauseTime: number,
  *   bufferingTime: number,
  *   licenseTime: number,
+ *   liveLatency: number,
+ *
+ *   maxSegmentDuration: number,
  *
  *   switchHistory: !Array.<shaka.extern.TrackChoice>,
  *   stateHistory: !Array.<shaka.extern.StateChange>
@@ -123,6 +127,12 @@ shaka.extern.StateChange;
  *   The total time spent in a buffering state in seconds.
  * @property {number} licenseTime
  *   The time spent on license requests during this session in seconds, or NaN.
+ * @property {number} liveLatency
+ *   The time between the capturing of a frame and the end user having it
+ *   displayed on their screen.
+ *
+ * @property {number} maxSegmentDuration
+ *   The presentation's max segment duration in seconds, or NaN.
  *
  * @property {!Array.<shaka.extern.TrackChoice>} switchHistory
  *   A history of the stream changes.
@@ -290,6 +300,12 @@ shaka.extern.Track;
 
 
 /**
+ * @typedef {!Array.<!shaka.extern.Track>}
+ */
+shaka.extern.TrackList;
+
+
+/**
  * @typedef {{
  *   minWidth: number,
  *   maxWidth: number,
@@ -383,6 +399,19 @@ shaka.extern.SupportType;
 
 
 /**
+ * @typedef {!Object.<string, ?>}
+ *
+ * @description
+ * ID3 metadata in format defined by
+ * https://id3.org/id3v2.3.0#Declared_ID3v2_frames
+ * The content of the field.
+ *
+ * @exportDoc
+ */
+shaka.extern.ID3Metadata;
+
+
+/**
  * @typedef {{
  *   schemeIdUri: string,
  *   value: string,
@@ -455,14 +484,6 @@ shaka.extern.EmsgInfo;
 
 
 /**
- * @typedef {function(!Element):Array.<shaka.extern.DrmInfo>}
- * @see shaka.extern.DashManifestConfiguration
- * @exportDoc
- */
-shaka.extern.DashContentProtectionCallback;
-
-
-/**
  * @typedef {{
  *   distinctiveIdentifierRequired: boolean,
  *   persistentStateRequired: boolean,
@@ -514,7 +535,10 @@ shaka.extern.AdvancedDrmConfiguration;
  *   delayLicenseRequestUntilPlayed: boolean,
  *   advanced: Object.<string, shaka.extern.AdvancedDrmConfiguration>,
  *   initDataTransform:
- *       ((function(!Uint8Array, ?shaka.extern.DrmInfo):!Uint8Array)|undefined)
+ *       ((function(!Uint8Array, string, ?shaka.extern.DrmInfo):!Uint8Array)|
+ *         undefined),
+ *   logLicenseExchange: boolean,
+ *   updateExpirationTime: number
  * }}
  *
  * @property {shaka.extern.RetryParameters} retryParameters
@@ -536,12 +560,22 @@ shaka.extern.AdvancedDrmConfiguration;
  *   A dictionary which maps key system IDs to advanced DRM configuration for
  *   those key systems.
  * @property
- *     {((function(!Uint8Array, ?shaka.extern.DrmInfo):!Uint8Array)|undefined)}
+ *     {((function(!Uint8Array, string, ?shaka.extern.DrmInfo):!Uint8Array)|
+ *        undefined)}
  *   initDataTransform
  *   <i>Optional.</i><br>
  *   If given, this function is called with the init data from the
  *   manifest/media and should return the (possibly transformed) init data to
  *   pass to the browser.
+ * @property {boolean} logLicenseExchange
+ *   <i>Optional.</i><br>
+ *   If set to <code>true</code>, prints logs containing the license exchange.
+ *   This includes the init data, request, and response data, printed as base64
+ *   strings.  Don't use in production, for debugging only; has no affect in
+ *   release builds as logging is removed.
+ * @property {number} updateExpirationTime
+ *   <i>Defaults to 1.</i> <br>
+ *   The frequency in seconds with which to check the expiration of a session.
  *
  * @exportDoc
  */
@@ -550,11 +584,9 @@ shaka.extern.DrmConfiguration;
 
 /**
  * @typedef {{
- *   customScheme: shaka.extern.DashContentProtectionCallback,
  *   clockSyncUri: string,
  *   ignoreDrmInfo: boolean,
  *   xlinkFailGracefully: boolean,
- *   defaultPresentationDelay: number,
  *   ignoreMinBufferTime: boolean,
  *   autoCorrectDrift: boolean,
  *   initialSegmentLimit: number,
@@ -562,10 +594,6 @@ shaka.extern.DrmConfiguration;
  *   ignoreEmptyAdaptationSet: boolean
  * }}
  *
- * @property {shaka.extern.DashContentProtectionCallback} customScheme
- *   If given, invoked by a DASH manifest parser to interpret custom or
- *   non-standard DRM schemes found in the manifest.  The argument is a
- *   ContentProtection node.  Return null if not recognized.
  * @property {string} clockSyncUri
  *   A default clock sync URI to be used with live streams which do not
  *   contain any clock sync information.  The <code>Date</code> header from this
@@ -579,10 +607,6 @@ shaka.extern.DrmConfiguration;
  *   existing contents. If false, xlink-related errors will be propagated
  *   to the application and will result in a playback failure. Defaults to
  *   false if not provided.
- * @property {number} defaultPresentationDelay
- *   A default <code>presentationDelay</code> if
- *   <code>suggestedPresentationDelay</code> is missing in the MPEG DASH
- *   manifest. This has to be bigger than <code>minBufferTime * 1.5</code>.
  * @property {boolean} ignoreMinBufferTime
  *   If true will cause DASH parser to ignore <code>minBufferTime</code> from
  *   manifest. It allows player config to take precedence over manifest for
@@ -614,12 +638,16 @@ shaka.extern.DashManifestConfiguration;
 
 /**
  * @typedef {{
- *   ignoreTextStreamFailures: boolean
+ *   ignoreTextStreamFailures: boolean,
+ *   useFullSegmentsForStartTime: boolean
  * }}
  *
  * @property {boolean} ignoreTextStreamFailures
  *   If <code>true</code>, ignore any errors in a text stream and filter out
  *   those streams.
+ * @property {boolean} useFullSegmentsForStartTime
+ *   If <code>true</code>, force HlsParser to use a full segment request for
+ *   determining start time in case the server does not support partial requests
  * @exportDoc
  */
 shaka.extern.HlsManifestConfiguration;
@@ -632,8 +660,10 @@ shaka.extern.HlsManifestConfiguration;
  *   disableAudio: boolean,
  *   disableVideo: boolean,
  *   disableText: boolean,
+ *   defaultPresentationDelay: number,
  *   dash: shaka.extern.DashManifestConfiguration,
- *   hls: shaka.extern.HlsManifestConfiguration
+ *   hls: shaka.extern.HlsManifestConfiguration,
+ *   lowLatencyMode: boolean
  * }}
  *
  * @property {shaka.extern.RetryParameters} retryParameters
@@ -652,10 +682,20 @@ shaka.extern.HlsManifestConfiguration;
  * @property {boolean} disableText
  *   If <code>true</code>, the text tracks are ignored.
  *   Defaults to <code>false</code>.
+ * @property {number} defaultPresentationDelay
+ *   A default <code>presentationDelay</code> value.
+ *   For DASH, it's a default <code>presentationDelay</code> value if
+ *   <code>suggestedPresentationDelay</code> is missing in the MPEG DASH
+ *   manifest. The default value is <code>1.5 * minBufferTime</code> if not
+ *   configured or set as 0.
+ *   For HLS, the default value is 3 segments duration if not configured or
+ *   set as 0.
  * @property {shaka.extern.DashManifestConfiguration} dash
  *   Advanced parameters used by the DASH manifest parser.
  * @property {shaka.extern.HlsManifestConfiguration} hls
  *   Advanced parameters used by the HLS manifest parser.
+ * @property {boolean} lowLatencyMode
+ *  If <code>true</code>, low latency streaming mode is enabled.
  *
  * @exportDoc
  */
@@ -680,7 +720,8 @@ shaka.extern.ManifestConfiguration;
  *   stallEnabled: boolean,
  *   stallThreshold: number,
  *   stallSkip: number,
- *   useNativeHlsOnSafari: boolean
+ *   useNativeHlsOnSafari: boolean,
+ *   inaccurateManifestTolerance: number
  * }}
  *
  * @description
@@ -747,20 +788,28 @@ shaka.extern.ManifestConfiguration;
  *   jump in the stream skipping more content. This is helpful for lower
  *   bandwidth scenarios. Defaults to 5 if not provided.
  * @property {boolean} stallEnabled
- *   When set to <code>true</code>, the stall detector logic will run, skipping
- *   forward <code>stallSkip</code> seconds whenever the playhead stops moving
- *   for <code>stallThreshold</code> seconds.
+ *   When set to <code>true</code>, the stall detector logic will run.  If the
+ *   playhead stops moving for <code>stallThreshold</code> seconds, the player
+ *   will either seek or pause/play to resolve the stall, depending on the value
+ *   of <code>stallSkip</code>.
  * @property {number} stallThreshold
  *   The maximum number of seconds that may elapse without the playhead moving
  *   (when playback is expected) before it will be labeled as a stall.
  * @property {number} stallSkip
  *   The number of seconds that the player will skip forward when a stall has
- *   been detected.
+ *   been detected.  If 0, the player will pause and immediately play instead of
+ *   seeking.  A value of 0 is recommended and provided as default on TV
+ *   platforms (WebOS, Tizen, Chromecast, etc).
  * @property {boolean} useNativeHlsOnSafari
  *   Desktop Safari has both MediaSource and their native HLS implementation.
  *   Depending on the application's needs, it may prefer one over the other.
  *   Examples: FairPlay is only supported via Safari's native HLS, but it
  *   doesn't have an API for selecting specific tracks.
+ * @property {number} inaccurateManifestTolerance
+ *   The maximum difference, in seconds, between the times in the manifest and
+ *   the times in the segments.  Larger values allow us to compensate for more
+ *   drift (up to one segment duration).  Smaller values reduce the incidence of
+ *   extra segment requests necessary to compensate for drift
  * @exportDoc
  */
 shaka.extern.StreamingConfiguration;
@@ -769,6 +818,7 @@ shaka.extern.StreamingConfiguration;
 /**
  * @typedef {{
  *   enabled: boolean,
+ *   useNetworkInformation: boolean,
  *   defaultBandwidthEstimate: number,
  *   restrictions: shaka.extern.Restrictions,
  *   switchInterval: number,
@@ -778,6 +828,9 @@ shaka.extern.StreamingConfiguration;
  *
  * @property {boolean} enabled
  *   If true, enable adaptation by the current AbrManager.  Defaults to true.
+ * @property {boolean} useNetworkInformation
+ *   If true, use Network Information API in the current AbrManager.
+ *   Defaults to true.
  * @property {number} defaultBandwidthEstimate
  *   The default bandwidth estimate to use if there is not enough data, in
  *   bit/sec.
@@ -806,17 +859,16 @@ shaka.extern.AbrConfiguration;
 /**
  * @typedef {{
  *   trackSelectionCallback:
- *       function(!Array.<shaka.extern.Track>):!Array.<shaka.extern.Track>,
+ *       function(shaka.extern.TrackList):!Promise<shaka.extern.TrackList>,
  *   progressCallback: function(shaka.extern.StoredContent,number),
  *   usePersistentLicense: boolean
  * }}
  *
- * @property {function(!Array.<shaka.extern.Track>):!Array.<shaka.extern.Track>}
+ * @property {function(shaka.extern.TrackList):!Promise<shaka.extern.TrackList>}
  *     trackSelectionCallback
  *   Called inside <code>store()</code> to determine which tracks to save from a
  *   manifest. It is passed an array of Tracks from the manifest and it should
- *   return an array of the tracks to store.  This is called for each Period in
- *   the manifest (in order).
+ *   return an array of the tracks to store.
  * @property {function(shaka.extern.StoredContent,number)} progressCallback
  *   Called inside <code>store()</code> to give progress info back to the app.
  *   It is given the current manifest being stored and the progress of it being

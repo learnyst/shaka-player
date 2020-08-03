@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,15 +19,13 @@ describe('CastUtils', () => {
       'destroy',  // Should use CastProxy.destroy instead
       'drmInfo',  // Too large to proxy
       'getManifest', // Too large to proxy
-      // TODO(vaage): Remove |getManifestUri| references in v2.6.
-      'getManifestUri',  // Handled specially by CastProxy
       'getManifestParserFactory',  // Would not serialize.
+      'setVideoContainer',
 
       // Test helper methods (not @export'd)
       'createDrmEngine',
       'createNetworkingEngine',
       'createPlayhead',
-      'createMediaSource',
       'createMediaSourceEngine',
       'createStreamingEngine',
     ];
@@ -40,22 +39,21 @@ describe('CastUtils', () => {
       castMembers.push(name);
     }
     // eslint-disable-next-line no-restricted-syntax
-    const playerMembers = Object.getOwnPropertyNames(shaka.Player.prototype)
-        .filter((name) => {
-          // Private members end with _.
-          return !ignoredMembers.includes(name) && !name.endsWith('_');
-        });
+    const allPlayerMembers = Object.getOwnPropertyNames(shaka.Player.prototype);
+    expect(
+        ignoredMembers.filter((member) => !allPlayerMembers.includes(member)))
+        .toEqual([]);
+    const playerMembers = allPlayerMembers.filter((name) => {
+      // Private members end with _.
+      return !ignoredMembers.includes(name) && !name.endsWith('_');
+    });
 
     // To make debugging easier, don't check that they are equal; instead check
     // that neither has any extra entries.
-    const extraCastMembers = castMembers.filter((name) => {
-      return !playerMembers.includes(name);
-    });
-    const extraPlayerMembers = playerMembers.filter((name) => {
-      return !castMembers.includes(name);
-    });
-    expect(extraCastMembers).toEqual([]);
-    expect(extraPlayerMembers).toEqual([]);
+    expect(castMembers.filter((name) => !playerMembers.includes(name)))
+        .toEqual([]);
+    expect(playerMembers.filter((name) => !castMembers.includes(name)))
+        .toEqual([]);
   });
 
   describe('serialize/deserialize', () => {
@@ -266,6 +264,40 @@ describe('CastUtils', () => {
         expect(TimeRangesUtils.getBufferedInfo(deserialized))
             .toEqual(TimeRangesUtils.getBufferedInfo(buffered));
       });
+    });  // describe('TimeRanges')
+
+    it('transfers real Errors', () => {
+      let realError;
+      try {
+        // Cast undefined to "?" to convince the compiler to let us dereference
+        // it.
+        const foo = /** @type {?} */(undefined);
+
+        // Now this will generate a TypeError.
+        foo.bar = 'baz';
+
+        // We need to catch a real Error in this test, so we disable eslint on
+        // the next line.
+        // eslint-disable-next-line no-restricted-syntax
+      } catch (error) {
+        realError = error;
+      }
+
+      // The event is turned into a string.
+      const serialized = CastUtils.serialize(realError);
+      expect(typeof serialized).toBe('string');
+
+      // The string is turned back into an object.
+      const deserialized = CastUtils.deserialize(serialized);
+      expect(typeof deserialized).toBe('object');
+
+      // And that object should be an Error type.
+      expect(deserialized).toEqual(jasmine.any(Error));
+
+      // At least these basic properties should match.
+      expect(deserialized.type).toBe(realError.type);
+      expect(deserialized.message).toBe(realError.message);
+      expect(deserialized.stack).toBe(realError.stack);
     });
-  });
-});
+  });  // describe('serialize/deserialize')
+});  // describe('CastUtils')

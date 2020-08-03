@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -9,6 +10,30 @@
  */
 
 /**
+ * @typedef {{
+ *   loadTimes: !Array.<number>,
+ *   started: number,
+ *   playedCompletely: number,
+ *   skipped: number
+ * }}
+ *
+ * @description
+ * Contains statistics and information about the current state of the player.
+ *
+ * @property {number} loadTimes
+ *   The set of amounts of time it took to get the final manifest.
+ * @property {number} started
+ *   The number of ads started.
+ * @property {number} playedCompletely
+ *   The number of ads played completely.
+ * @property {number} skipped
+ *   The number of ads skipped.
+ * @exportDoc
+ */
+shaka.extern.AdsStats;
+
+
+/**
  * An object that's responsible for all the ad-related logic
  * in the player.
  *
@@ -16,6 +41,11 @@
  * @exportDoc
  */
 shaka.extern.IAdManager = class extends EventTarget {
+  /**
+   * @param {string} locale
+   */
+  setLocale(locale) {}
+
   onAssetUnload() {}
 
   /**
@@ -28,13 +58,53 @@ shaka.extern.IAdManager = class extends EventTarget {
    * @param {!google.ima.AdsRequest} imaRequest
    */
   requestClientSideAds(imaRequest) {}
+
+  /**
+   * @param {!HTMLElement} adContainer
+   * @param {!HTMLMediaElement} video
+   */
+  initServerSide(adContainer, video) {}
+
+  /**
+   * @param {!google.ima.dai.api.StreamRequest} imaRequest
+   * @param {string=} backupUrl
+   * @return {!Promise.<!string>}
+   */
+  requestServerSideStream(imaRequest, backupUrl) {}
+
+  /**
+   * @param {Object} adTagParameters
+   */
+  replaceServerSideAdTagParameters(adTagParameters) {}
+
+  /**
+   * Get statistics for the current playback session. If the player is not
+   * playing content, this will return an empty stats object.
+   */
+  getStats() {}
+
+  /**
+   * @param {shaka.extern.TimelineRegionInfo} region
+   */
+  onDashTimedMetadata(region) {}
+
+  /**
+   * @param {shaka.extern.ID3Metadata} metadata
+   * @param {number} timestampOffset
+   */
+  onHlsTimedMetadata(metadata, timestampOffset) {}
+
+  /**
+   * @param {shaka.extern.ID3Metadata} value
+   */
+  onCueMetadataChange(value) {}
 };
 
 
 /**
- * A factory for creating the ad manager.  This will be called with 'new'.
+ * A factory for creating the ad manager.
  *
- * @typedef {function(new:shaka.extern.IAdManager)}
+ * @typedef {function():!shaka.extern.IAdManager}
  * @exportDoc
  */
 shaka.extern.IAdManager.Factory;

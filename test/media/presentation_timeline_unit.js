@@ -1,10 +1,15 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 describe('PresentationTimeline', () => {
   const originalDateNow = Date.now;
+  const makeSegmentReference = (startTime, endTime) => {
+    return shaka.test.ManifestParser.makeReference(
+        'foo.mp4', startTime, endTime);
+  };
 
   /** @type {!Date} */
   let baseTime;
@@ -107,28 +112,6 @@ describe('PresentationTimeline', () => {
     expect(timeline.isLive()).toBe(true);
     expect(timeline.isInProgress()).toBe(false);
     return timeline;
-  }
-
-  /**
-   * Creates a simple, dummy segment reference.
-   * @param {number} startTime
-   * @param {number} endTime
-   * @return {shaka.media.SegmentReference}
-   */
-  function makeSegmentReference(startTime, endTime) {
-    // start and end times are the only fields that matter to
-    // PresentationTimeline.
-    return new shaka.media.SegmentReference(
-        /* position= */ 0,
-        startTime,
-        endTime,
-        /* uris= */ () => [],
-        /* startByte= */ 0,
-        /* endByte= */ null,
-        /* initSegmentReference= */ null,
-        /* timestampOffset= */ 0,
-        /* appendWindowStart= */ 0,
-        /* appendWindowEnd= */ Infinity);
   }
 
   describe('getSegmentAvailabilityStart', () => {

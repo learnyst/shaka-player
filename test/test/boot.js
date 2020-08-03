@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -107,6 +108,8 @@ function getClientArg(name) {
     if (seed) {
       jasmine.getEnv().seed(seed.toString());
     }
+  } else {
+    jasmine.getEnv().randomizeTests(false);
   }
 
   /**
@@ -204,6 +207,22 @@ function getClientArg(name) {
     });
   };
 
+  /**
+   * Unconditionally skip contained tests that would normally be run
+   * conditionally.  Used to temporarily disable tests that use filterDescribe.
+   * See filterDescribe above.
+   *
+   * @param {string} describeName
+   * @param {function():*} cond
+   * @param {function()} describeBody
+   */
+  window.xfilterDescribe = (describeName, cond, describeBody) => {
+    const oldDescribe = window['describe'];
+    window['describe'] = window['xdescribe'];
+    filterDescribe(describeName, cond, describeBody);
+    window['describe'] = oldDescribe;
+  };
+
   beforeAll((done) => {  // eslint-disable-line no-restricted-syntax
     // Configure AMD modules and their dependencies.
     require.config({
@@ -217,17 +236,22 @@ function getClientArg(name) {
           name: 'less',
           main: 'dist/less',
         },
+        {
+          name: 'fontfaceonload',
+          main: 'dist/fontfaceonload',
+        },
       ],
     });
 
     // Load required AMD modules, then proceed with tests.
-    require(['sprintf-js', 'less'],
-        (sprintfJs, less) => {
+    require(['sprintf-js', 'less', 'fontfaceonload'],
+        (sprintfJs, less, FontFaceOnload) => {
           // These external interfaces are declared as "const" in the externs.
           // Avoid "const"-ness complaints from the compiler by assigning these
           // using bracket notation.
           window['sprintf'] = sprintfJs.sprintf;
           window['less'] = less;
+          window['FontFaceOnload'] = FontFaceOnload;
 
           done();
         });

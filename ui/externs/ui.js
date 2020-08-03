@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -20,7 +21,8 @@ shaka.extern = {};
  * @typedef {{
  *   base: string,
  *   buffered: string,
- *   played: string
+ *   played: string,
+ *   adBreaks: string
  * }}
  *
  * @property {string} base
@@ -32,6 +34,9 @@ shaka.extern = {};
  * @property {string} played
  *   The CSS background color applied to the portion of the seek bar showing
  *   what has been played already.
+ * @property {string} adBreaks
+ *   The CSS background color applied to the portion of the seek bar showing
+ *   when the ad breaks are scheduled to occur on the timeline.
  */
 shaka.extern.UISeekBarColors;
 
@@ -58,10 +63,15 @@ shaka.extern.UIVolumeBarColors;
  *   addBigPlayButton: boolean,
  *   castReceiverAppId: string,
  *   clearBufferOnQualityChange: boolean,
+ *   showUnbufferedStart: boolean,
  *   seekBarColors: shaka.extern.UISeekBarColors,
  *   volumeBarColors: shaka.extern.UIVolumeBarColors,
  *   trackLabelFormat: shaka.ui.TrackLabelFormat,
- *   fadeDelay: number
+ *   fadeDelay: number,
+ *   doubleClickForFullscreen: boolean,
+ *   enableKeyboardPlaybackControls: boolean,
+ *   enableFullscreenOnRotation: boolean,
+ *   forceLandscapeOnFullscreen: boolean
  * }}
  *
  * @property {!Array.<string>} controlPanelElements
@@ -83,6 +93,17 @@ shaka.extern.UIVolumeBarColors;
  *   resolution is being buffered. Not clearing the buffer will mean
  *   we play the content in the previously selected resolution that we
  *   already have buffered before switching to the new resolution.
+ * @property {boolean} showUnbufferedStart
+ *   If true, color any unbuffered region at the start of the seek bar as
+ *   unbuffered (using the "base" color).  If false, color any unbuffered region
+ *   at the start of the seek bar as played (using the "played" color).
+ *   <br>
+ *   A value of false matches the default behavior of Chrome's native controls
+ *   and Shaka Player v3.0+.
+ *   <br>
+ *   A value of true matches the default behavior of Shaka Player v2.5.
+ *   <br>
+ *   Defaults to false.
  * @property {shaka.extern.UISeekBarColors} seekBarColors
  *   The CSS colors applied to the seek bar.  This allows you to override the
  *   colors used in the linear gradient constructed in JavaScript, since you
@@ -103,12 +124,31 @@ shaka.extern.UIVolumeBarColors;
  *   interacting with them.  We recommend setting this to 3 on your cast
  *   receiver UI.
  *   Defaults to 0.
+ * @property {boolean} doubleClickForFullscreen
+ *   Whether or not double-clicking on the UI should cause it to enter
+ *   fullscreen.
+ *   Defaults to true.
+ * @property {boolean} enableKeyboardPlaybackControls
+ *   Whether or not playback controls via keyboard is enabled, such as seek
+ *   forward, seek backward, jump to the beginning/end of the video.
+ *   Defaults to true.
+ * @property {boolean} enableFullscreenOnRotation
+ *   Whether or not to enter/exit fullscreen mode when the screen is rotated.
+ *   Defaults to true.
+ * @property {boolean} forceLandscapeOnFullscreen
+ *   Whether or not the device should rotate to landscape mode when the video
+ *   enters fullscreen.  Note that this behavior is based on an experimental
+ *   browser API, and may not work on all platforms.
+ *   Defaults to true.
  */
 shaka.extern.UIConfiguration;
 
 
 /**
- * Interface for UI elements.
+ * Interface for UI elements.  UI elements should inherit from the concrete base
+ * class shaka.ui.Element.  The members defined in this extern's constructor are
+ * all available from the base class, and are defined here to keep the compiler
+ * from renaming them.
  *
  * @extends {shaka.util.IReleasable}
  * @interface
@@ -155,6 +195,18 @@ shaka.extern.IUIElement = class {
      * @exportDoc
      */
     this.video;
+
+    /**
+     * @protected {shaka.extern.IAdManager}
+     * @exportDoc
+     */
+    this.adManager;
+
+    /**
+     * @protected {shaka.extern.IAd}
+     * @exportDoc
+     */
+    this.ad;
   }
 
   /**

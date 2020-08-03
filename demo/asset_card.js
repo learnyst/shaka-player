@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -58,15 +59,18 @@ shakaDemo.AssetCard = class {
     if (asset.iconUri) {
       const picture = document.createElement('picture');
 
-      const webpSource = document.createElement('source');
+      const webpSource =
+        /** @type {!HTMLSourceElement} */(document.createElement('source'));
       webpSource.srcset = asset.iconUri.replace(/.png$/, '.webp');
       webpSource.type = 'image/webp';
 
-      const pngSource = document.createElement('source');
+      const pngSource =
+        /** @type {!HTMLSourceElement} */(document.createElement('source'));
       pngSource.srcset = asset.iconUri;
       pngSource.type = 'image/png';
 
-      const img = document.createElement('img');
+      const img =
+        /** @type {!HTMLImageElement} */(document.createElement('img'));
       img.src = asset.iconUri;
       img.alt = '';  // Not necessary to understand the page
 
@@ -255,7 +259,7 @@ shakaDemo.AssetCard = class {
       attachPoint.classList.add('asset-card-corner-button');
       const icon = document.createElement('i');
       icon.textContent = iconText;
-      icon.classList.add('material-icons');
+      icon.classList.add('material-icons-round');
       button.appendChild(icon);
     };
 
@@ -291,7 +295,7 @@ shakaDemo.AssetCard = class {
   }
 
   /**
-   * @param {!Element} deleteButton
+   * @param {!HTMLButtonElement} deleteButton
    * @private
    */
   attachDeleteDialog_(deleteButton) {
@@ -314,7 +318,8 @@ shakaDemo.AssetCard = class {
    * @private
    */
   makeYesNoDialogue_(parentDiv, text, callback) {
-    const dialog = document.createElement('dialog');
+    const dialog =
+      /** @type {!HTMLDialogElement} */(document.createElement('dialog'));
     dialog.classList.add('mdl-dialog');
     parentDiv.appendChild(dialog);
     if (!dialog.showModal) {
@@ -360,11 +365,15 @@ shakaDemo.AssetCard = class {
     if (this.asset_.storedProgress < 1) {
       this.progressCircle_.classList.remove('hidden');
       for (const button of this.actions_.childNodes) {
+        goog.asserts.assert(
+            button instanceof HTMLButtonElement, 'Wrong node type!');
         button.disabled = true;
       }
     } else {
       this.progressCircle_.classList.add('hidden');
       for (const button of this.actions_.childNodes) {
+        goog.asserts.assert(
+            button instanceof HTMLButtonElement, 'Wrong node type!');
         button.disabled = false;
       }
     }
@@ -377,10 +386,11 @@ shakaDemo.AssetCard = class {
    * @param {?shakaDemo.MessageIds} name
    * @param {function()} onclick
    * @param {shakaDemo.MessageIds=} yesNoDialogText
-   * @return {!Element}
+   * @return {!HTMLButtonElement}
    */
   addButton(name, onclick, yesNoDialogText) {
-    const button = document.createElement('button');
+    const button =
+      /** @type {!HTMLButtonElement} */(document.createElement('button'));
     button.classList.add('mdl-button');
     button.classList.add('mdl-button--colored');
     button.classList.add('mdl-js-button');

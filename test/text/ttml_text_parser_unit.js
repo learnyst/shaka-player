@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -41,7 +42,11 @@ describe('TtmlTextParser', () => {
           {
             startTime: 62.03,
             endTime: 62.05,
-            nestedCues: [{payload: 'A B C'}],
+            nestedCues: [{
+              payload: 'A B C',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
             payload: '',
           },
         ],
@@ -53,8 +58,11 @@ describe('TtmlTextParser', () => {
           {
             startTime: 62.03,
             endTime: 62.05,
-            nestedCues: [{payload: ' A    B   C  '}],
-            payload: '',
+            nestedCues: [{
+              payload: ' A    B   C  ',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
           },
         ],
         '<tt xml:space="preserve">' + ttBody + '</tt>',
@@ -65,8 +73,11 @@ describe('TtmlTextParser', () => {
           {
             startTime: 62.03,
             endTime: 62.05,
-            nestedCues: [{payload: 'A B C'}],
-            payload: '',
+            nestedCues: [{
+              payload: 'A B C',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
           },
         ],
         '<tt>' + ttBody + '</tt>',
@@ -97,9 +108,22 @@ describe('TtmlTextParser', () => {
             endTime: 3723.2,
             payload: '',
             nestedCues: [
-              {payload: 'First cue'},
-              {payload: '', spacer: true},
-              {payload: 'Second cue'},
+              {
+                payload: 'First cue',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+              {
+                payload: '',
+                spacer: true,
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+              {
+                payload: 'Second cue',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
             ],
           },
         ],
@@ -125,6 +149,28 @@ describe('TtmlTextParser', () => {
         ],
         '<tt><body><p begin="01:02.05" ' +
         'end="01:02:03.200">Test</p></body></tt>',
+        {periodStart: 7, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('supports nested cues with an offset', () => {
+    verifyHelper(
+        [
+          {
+            startTime: 69.05,
+            endTime: 3730.2,
+            payload: '',
+            nestedCues: [
+              {
+                payload: 'Nested cue',
+                startTime: 69.05,
+                endTime: 3730.2,
+              },
+            ],
+          },
+        ],
+        '<tt><body><div>' +
+        '<p begin="01:02.05" end="01:02:03.200"><span>Nested cue</span></p>' +
+        '</div></body></tt>',
         {periodStart: 7, segmentStart: 0, segmentEnd: 0});
   });
 
@@ -753,7 +799,11 @@ describe('TtmlTextParser', () => {
           {
             startTime: 62.05,
             endTime: 3723.2,
-            nestedCues: [{payload: 'Line1\nLine2'}],
+            nestedCues: [{
+              payload: 'Line1\nLine2',
+              startTime: 62.05,
+              endTime: 3723.2,
+            }],
             payload: '',
           },
         ],
@@ -792,8 +842,8 @@ describe('TtmlTextParser', () => {
     verifyHelper(
         [
           {
-            startTime: 62.05,
-            endTime: 3723.2,
+            startTime: 1,
+            endTime: 2,
             payload: 'Test',
             color: 'red',
             backgroundColor: 'blue',
@@ -802,6 +852,12 @@ describe('TtmlTextParser', () => {
             fontStyle: Cue.fontStyle.ITALIC,
             lineHeight: '20px',
             fontSize: '10em',
+          },
+          {
+            startTime: 2,
+            endTime: 4,
+            payload: 'Test 2',
+            fontSize: '0.80c',
           },
         ],
         '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
@@ -813,12 +869,14 @@ describe('TtmlTextParser', () => {
         'tts:fontStyle="italic" ' +
         'tts:lineHeight="20px" ' +
         'tts:fontSize="10em"/>' +
+        '<style xml:id="s2" tts:fontSize="0.80c" />' +
         '</styling>' +
         '<layout>' +
         '<region xml:id="subtitleArea" />' +
         '</layout>' +
         '<body region="subtitleArea">' +
-        '<p begin="01:02.05" end="01:02:03.200" style="s1">Test</p>' +
+        '<p begin="00:01.00" end="00:02.00" style="s1">Test</p>' +
+        '<p begin="00:02.00" end="00:04.00" style="s2">Test 2</p>' +
         '</body>' +
         '</tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
@@ -875,6 +933,87 @@ describe('TtmlTextParser', () => {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
+  it('cues should have default cellResolution', () => {
+    verifyHelper(
+        [
+          {
+            startTime: 1,
+            endTime: 2,
+            cellResolution: {
+              columns: 32,
+              rows: 15,
+            },
+            fontSize: '0.45c',
+          },
+        ],
+        '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
+        '<styling>' +
+        '<style xml:id="s1" tts:fontSize="0.45c"/>' +
+        '</styling>' +
+        '<body >' +
+        '<p begin="00:01.00" end="00:02.00" style="s1">Test</p>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('parses cellResolution', () => {
+    verifyHelper(
+        [
+          {
+            startTime: 1,
+            endTime: 2,
+            payload: 'Test',
+            cellResolution: {
+              columns: 60,
+              rows: 20,
+            },
+            fontSize: '67%',
+          },
+        ],
+        '<tt ' +
+        'xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
+        'xmlns:tts="http://www.w3.org/ns/ttml#styling" ' +
+        'ttp:cellResolution="60 20">' +
+        '<styling>' +
+        '<style xml:id="s1" tts:fontSize="67%"/>' +
+        '</styling>' +
+        '<body >' +
+        '<p begin="00:01.00" end="00:02.00" style="s1">Test</p>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('parses line padding', () => {
+    verifyHelper(
+        [
+          {
+            startTime: 1,
+            endTime: 2,
+            payload: 'Test',
+            cellResolution: {
+              columns: 60,
+              rows: 20,
+            },
+            linePadding: '0.5c',
+          },
+        ],
+        '<tt ' +
+        'xmlns:ttp="http://www.w3.org/ns/ttml#parameter" ' +
+        'xmlns:tts="http://www.w3.org/ns/ttml#styling" ' +
+        'xmlns:ebutts="urn:ebu:tt:style" ' +
+        'ttp:cellResolution="60 20">' +
+        '<styling>' +
+        '<style xml:id="s1" ebutts:linePadding="0.5c"/>' +
+        '</styling>' +
+        '<body >' +
+        '<p begin="00:01.00" end="00:02.00" style="s1">Test</p>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
   it('chooses style on element over style on region', () => {
     verifyHelper(
         [
@@ -913,6 +1052,27 @@ describe('TtmlTextParser', () => {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
+  // Regression test for https://github.com/google/shaka-player/issues/2478
+  it('supports nested cues with only non-ASCII characters', () => {
+    verifyHelper(
+        [
+          {
+            startTime: 62.05,
+            endTime: 3723.2,
+            payload: '',
+            nestedCues: [
+              {
+                payload: 'äöü',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+            ],
+          },
+        ],
+        '<tt><body><p begin="01:02.05" end="01:02:03.200">' +
+        '<span>äöü</span></p></body></tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
 
   /**
    * @param {!Array} cues

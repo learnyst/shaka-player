@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc.
+# Copyright 2016 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -25,6 +25,7 @@ requirement: {
   error_message: 'Throwing non-Error types or Error itself is not allowed; '
                  'throw shaka.util.Error instead.'
   whitelist_regexp: 'test/'
+  whitelist_regexp: 'node_modules/'
 }
 requirement: {
   type: BANNED_CODE_PATTERN
@@ -32,6 +33,7 @@ requirement: {
   error_message: 'Throwing non-Error types or Error itself is not allowed; '
                  'throw shaka.util.Error instead.'
   whitelist_regexp: 'test/'
+  whitelist_regexp: 'node_modules/'
 }
 
 
@@ -79,7 +81,6 @@ requirement {
   java_class: 'com.google.javascript.jscomp.ConformanceRules$BanGlobalVars'
   error_message: 'Global variables are not allowed!'
   whitelist_regexp: 'demo/'
-  whitelist_regexp: 'third_party/closure/'
   whitelist_regexp: 'test/'
   whitelist_regexp: 'node_modules/'
 }
@@ -94,6 +95,7 @@ requirement: {
          'function template(b, n) { b = !n; }'
   error_message: 'Using "!" on nullable numbers in boolean assignment '
                  'is not allowed; use an explicit comparison instead.'
+  whitelist_regexp: 'node_modules/'
 }
 
 requirement: {
@@ -143,8 +145,22 @@ requirement: {
                  'use shaka.log instead'
   whitelist_regexp: 'demo/'
   whitelist_regexp: 'lib/debug/log.js'
-  whitelist_regexp: 'third_party/closure/'
   whitelist_regexp: 'test/test/boot.js'
+  whitelist_regexp: 'node_modules/'
+}
+
+# Disallow querySelector and querySelectorAll since they aren't supported on
+# Shaka Player Embedded.
+requirement: {
+  type: BANNED_PROPERTY_CALL
+  value: 'Element.prototype.querySelector'
+  value: 'Document.prototype.querySelector'
+  value: 'Element.prototype.querySelectorAll'
+  value: 'Document.prototype.querySelectorAll'
+  error_message: 'Use getElementsByTagName'
+  whitelist_regexp: 'demo/'
+  whitelist_regexp: 'ui/'
+  whitelist_regexp: 'test/'
   whitelist_regexp: 'node_modules/'
 }
 
@@ -186,6 +202,18 @@ requirement: {
   type: BANNED_PROPERTY
   value: 'HTMLInputElement.prototype.valueAsNumber'
   error_message: '"Input.valueAsNumber" is not supported on IE11'
+}
+
+
+# Disallow DOMRect.x and y.
+requirement: {
+  type: BANNED_PROPERTY
+  value: 'DOMRect.prototype.x'
+  value: 'DOMRect.prototype.y'
+  error_message: 'DOMRect "x" and "y" are not supported on IE11 and legacy '
+                 'Edge; use "left" and "top" instead.'
+  # The built-in set and map polyfills trigger this ban somehow.
+  whitelist_regexp: 'synthetic:es6/'
 }
 
 
@@ -264,12 +292,14 @@ requirement: {
   value: 'window.eval'
   error_message: 'Using "eval" is not allowed'
   whitelist_regexp: 'demo/demo_utils.js'
+  whitelist_regexp: 'node_modules/google-closure-library/closure/goog/base.js'
 }
 requirement: {
   type: BANNED_NAME
   value: 'eval'
   error_message: 'Using "eval" is not allowed'
   whitelist_regexp: 'demo/demo_utils.js'
+  whitelist_regexp: 'node_modules/google-closure-library/closure/goog/base.js'
 }
 
 

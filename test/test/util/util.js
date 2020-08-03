@@ -1,10 +1,47 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
 
 goog.provide('shaka.test.StatusPromise');
 goog.provide('shaka.test.Util');
+
+
+/**
+ * A stand-in type for the "shaka" namespace.  Used when loading the compiled
+ * library or when referencing it in ManifestGenerator or TestScheme.
+ *
+ * The new compiler has a "typeof" annotation for classes, but it warns of an
+ * incomplete type when used on the entire library namespace.  So instead, we
+ * use this type, which maps out parts of the compiled namespace used in
+ * top-level integration tests.
+ *
+ * @typedef {{
+ *   Player: typeof shaka.Player,
+ *   media: {
+ *     SegmentReference: typeof shaka.media.SegmentReference,
+ *     InitSegmentReference: typeof shaka.media.InitSegmentReference,
+ *     SegmentIndex: typeof shaka.media.SegmentIndex,
+ *     PresentationTimeline: typeof shaka.media.PresentationTimeline
+ *   },
+ *   net: {
+ *     NetworkingEngine: typeof shaka.net.NetworkingEngine
+ *   },
+ *   offline: {
+ *     Storage: typeof shaka.offline.Storage
+ *   },
+ *   ui: {
+ *     Overlay: typeof shaka.ui.Overlay,
+ *     Controls: typeof shaka.ui.Controls,
+ *     Element: typeof shaka.ui.Element
+ *   },
+ *   util: {
+ *     StringUtils: typeof shaka.util.StringUtils
+ *   }
+ * }}
+ */
+let shakaNamespaceType;
 
 
 /**
@@ -20,13 +57,14 @@ shaka.test.StatusPromise = class {
     this.status;
 
     // TODO: investigate using expectAsync() for this when possible.
-    p.status = 'pending';
-    p.then(() => {
-      p.status = 'resolved';
+    const p2 = /** @type {!shaka.test.StatusPromise} */(p);
+    p2.status = 'pending';
+    p2.then(() => {
+      p2.status = 'resolved';
     }, () => {
-      p.status = 'rejected';
+      p2.status = 'rejected';
     });
-    return /** @type {!shaka.test.StatusPromise} */(p);
+    return p2;
   }
 };
 
@@ -90,20 +128,21 @@ shaka.test.Util = class {
   /**
    * Creates a custom matcher object that matches a number that is close to the
    * given value.
+   *
    * @param {number} val
-   * @return {!Object}
+   * @return {number}
    */
   static closeTo(val) {
     const E = 0.000001;
-    return {
+    return /** @type {number} */(/** @type {?} */({
       asymmetricMatch: (other) => other >= val - E && other <= val + E,
       jasmineToString: () => '<closeTo: ' + val + '>',
-    };
+    }));
   }
 
   /**
    * @param {!shaka.util.Error} error
-   * @return {!Object}
+   * @return {jasmine.ObjectContainingType}
    */
   static jasmineError(error) {
     // NOTE: Safari will add extra properties to any thrown object, and some of
@@ -212,8 +251,10 @@ shaka.test.Util = class {
     const isInit = first instanceof shaka.media.InitSegmentReference &&
         second instanceof shaka.media.InitSegmentReference;
     if (isSegment || isInit) {
-      const a = first.getUris();
-      const b = second.getUris();
+      const firstRef = /** @type {shaka.media.AnySegmentReference} */(first);
+      const secondRef = /** @type {shaka.media.AnySegmentReference} */(second);
+      const a = firstRef.getUris();
+      const b = secondRef.getUris();
       if (typeof a !== 'object' || typeof b !== 'object' ||
           typeof a.length != 'number' || typeof b.length !== 'number') {
         return false;
@@ -224,14 +265,18 @@ shaka.test.Util = class {
       }
 
       // Make shallow copies of each, without their getUris fields.
-      const trimmedFirst = Object.assign({}, /** @type {Object} */(first));
-      delete trimmedFirst.getUris;
-      const trimmedSecond = Object.assign({}, /** @type {Object} */(second));
-      delete trimmedSecond.getUris;
+      const trimmedFirst = Object.assign({}, /** @type {Object} */(firstRef));
+      delete trimmedFirst['getUris'];
+      const trimmedSecond = Object.assign({}, /** @type {Object} */(secondRef));
+      delete trimmedSecond['getUris'];
 
       // Compare those using Jasmine's utility, which will compare the fields of
       // an object and the items of an array.
-      return jasmine.matchersUtil.equals(trimmedFirst, trimmedSecond);
+      const customEqualityTesters = [
+        shaka.test.Util.compareReferences,
+      ];
+      return jasmine.matchersUtil.equals(
+          trimmedFirst, trimmedSecond, customEqualityTesters);
     }
 
     return undefined;
@@ -255,7 +300,12 @@ shaka.test.Util = class {
             !!xhr.response) {
           resolve(/** @type {!ArrayBuffer} */(xhr.response));
         } else {
-          reject(xhr.status);
+          let message = '';
+          if (xhr.response) {
+            message = ': ' + shaka.util.StringUtils.fromUTF8(
+                /** @type {!ArrayBuffer} */(xhr.response));
+          }
+          reject(xhr.status + message);
         }
       };
 
@@ -280,6 +330,14 @@ shaka.test.Util = class {
   }
 
   /**
+   * @param {!Function} func
+   * @return {!jasmine.Spy}
+   */
+  static funcSpy(func) {
+    return /** @type {!jasmine.Spy} */(func);
+  }
+
+  /**
    * @param {!jasmine.Spy} spy
    * @return {!Function}
    */
@@ -293,33 +351,50 @@ shaka.test.Util = class {
    * @return {*}
    */
   static invokeSpy(spy, ...varArgs) {
-    return spy(...varArgs);
+    // TODO: There should be a way to alter the externs for jasmine.Spy so that
+    // this utility is not needed.
+    // Why isn't there something like ICallable in Closure?
+    // https://github.com/google/closure-compiler/issues/946
+    // Why isn't it enough that jasmine.Spy extends Function?
+    // https://github.com/google/closure-compiler/issues/1422
+    return /** @type {Function} */(spy)(...varArgs);
   }
 
   /**
    * @param {boolean} loadUncompiled
-   * @return {*}
+   * @return {!Promise.<shakaNamespaceType>}
    */
   static async loadShaka(loadUncompiled) {
     /** @type {!shaka.util.PublicPromise} */
     const loaded = new shaka.util.PublicPromise();
+    /** @type {shakaNamespaceType} */
     let compiledShaka;
+
     if (loadUncompiled) {
       // For debugging purposes, use the uncompiled library.
-      compiledShaka = shaka;
+      compiledShaka = window['shaka'];
       loaded.resolve();
     } else {
       // Load the compiled library as a module.
       // All tests in this suite will use the compiled library.
       require(['/base/dist/shaka-player.ui.js'], (shakaModule) => {
-        compiledShaka = shakaModule;
-        compiledShaka.net.NetworkingEngine.registerScheme(
-            'test', shaka.test.TestScheme.plugin);
-        compiledShaka.media.ManifestParser.registerParserByMime(
-            'application/x-test-manifest',
-            shaka.test.TestScheme.ManifestParser);
+        try {
+          compiledShaka = shakaModule;
+          compiledShaka.net.NetworkingEngine.registerScheme(
+              'test', shaka.test.TestScheme.plugin);
+          compiledShaka.media.ManifestParser.registerParserByMime(
+              'application/x-test-manifest',
+              shaka.test.TestScheme.ManifestParser.factory);
 
-        loaded.resolve();
+          loaded.resolve();
+
+          // We need to catch thrown exceptions here to propertly report errors
+          // in the registration process above.
+          // eslint-disable-next-line no-restricted-syntax
+        } catch (error) {
+          loaded.reject('Failed to register with compiled player.');
+          shaka.log.error('Error registering with compiled player.', error);
+        }
       }, (error) => {
         loaded.reject('Failed to load compiled player.');
         shaka.log.error('Error loading compiled player.', error);
@@ -378,18 +453,117 @@ shaka.test.Util = class {
   }
 
   /**
-   * Returns a function that can be used as a factory.  This factory returns
-   * the given static value.
+   * Waits for a particular font to be loaded.  Useful in screenshot tests to
+   * make sure we have consistent results with regard to the web fonts we load
+   * in the UI.
    *
-   * @param {T} value
-   * @return {function():T}
-   * @template T
+   * @param {string} name
+   * @return {!Promise}
    */
-  static factoryReturns(value) {
-    // eslint-disable-next-line no-restricted-syntax
-    return function() {
-      return value;
-    };
+  static async waitForFont(name) {
+    await new Promise((resolve, reject) => {
+      // https://github.com/zachleat/fontfaceonload
+      // eslint-disable-next-line new-cap
+      FontFaceOnload(name, {
+        success: resolve,
+        error: () => {
+          reject(new Error('Timeout waiting for font ' + name + ' to load'));
+        },
+        timeout: 10 * 1000,  // ms
+      });
+    });
+
+    // Wait one extra tick to make sure the font rendering on the page has been
+    // updated.  Without this, we saw some rare test flake in Firefox on Mac.
+    await this.shortDelay();
+  }
+
+  /**
+   * Checks with Karma to see if this browser can take a screenshot.
+   *
+   * Only WebDriver-connected browsers can take a screenshot, and only Karma
+   * knows if the browser is connected via WebDriver.  So this must be checked
+   * in Karma via an HTTP request.
+   *
+   * @return {!Promise.<boolean>}
+   */
+  static async supportsScreenshots() {
+    // We need our own ID for Karma to look up the WebDriver connection.
+    const parentUrlParams = window.parent.location.search;
+    goog.asserts.assert(parentUrlParams.includes('id='), 'No ID in URL!');
+
+    const buffer = await shaka.test.Util.fetch(
+        '/screenshot/isSupported' + parentUrlParams);
+    const json = shaka.util.StringUtils.fromUTF8(buffer);
+    const ok = /** @type {boolean} */(JSON.parse(json));
+    return ok;
+  }
+
+  /**
+   * Asks Karma to take a screenshot for us via the WebDriver connection and
+   * compare it to the "official" screenshot for this test and platform.  Sets
+   * an expectation that the new screenshot does not differ from the official
+   * screenshot more than a fixed threshold.
+   *
+   * Only works on browsers connected via WebDriver.  Use supportsScreenshots()
+   * to filter screenshot-dependent tests.
+   *
+   * @param {!HTMLElement} element The HTML element to screenshot.  Must be
+   *   within the bounds of the viewport.
+   * @param {string} name An identifier for the screenshot.  Use alphanumeric
+   *   plus dash and underscore only.
+   * @param {number} threshold A change threshold in pixels.
+   * @return {!Promise}
+   */
+  static async checkScreenshot(element, name, threshold=0) {
+    // Make sure the DOM is up-to-date and layout has settled before continuing.
+    // Without this delay, or with a shorter delay, we sometimes get missing
+    // elements in our UITextDisplayer tests on some platforms.
+    await this.delay(0.1);
+
+    // We need our own ID for Karma to look up the WebDriver connection.
+    const parentUrlParams = window.parent.location.search;
+    goog.asserts.assert(parentUrlParams.includes('id='), 'No ID in URL!');
+
+    // Tests run in an iframe.  So we also need the coordinates of that iframe
+    // within the page, so that the screenshot can be consistently cropped to
+    // the element we care about.
+    const iframe = /** @type {HTMLIFrameElement} */(
+      window.parent.document.getElementById('context'));
+    const iframeRect = iframe.getBoundingClientRect();
+    const elementRect = element.getBoundingClientRect();
+    const x = iframeRect.left + elementRect.left;
+    const y = iframeRect.top + elementRect.top;
+    const width = elementRect.width;
+    const height = elementRect.height;
+
+    // Furthermore, the screenshot may not be at the scale you expect.  Measure
+    // the browser window size in JavaScript and communicate that to Karma, too,
+    // so it can convert coordinates before cropping.  This value, as opposed to
+    // document.body.getBoundingClientRect(), seems to most accurately reflect
+    // the size of the screenshot area.
+    const bodyWidth = window.parent.innerWidth;
+    const bodyHeight = window.parent.innerHeight;
+
+    // In addition to the id param from the top-level window, pass these
+    // parameters to the screenshot endpoint in Karma.
+    const params = {x, y, width, height, bodyWidth, bodyHeight, name};
+
+    let paramsString = '';
+    for (const k in params) {
+      paramsString += '&' + k + '=' + params[k];
+    }
+
+    const buffer = await shaka.test.Util.fetch(
+        '/screenshot/diff' + parentUrlParams + paramsString);
+    const json = shaka.util.StringUtils.fromUTF8(buffer);
+    const pixelsChanged = /** @type {number} */(JSON.parse(json));
+
+    // If the change threshold is exceeded, you can review the new screenshot
+    // and the diff image in the screenshots folder.  Look for images that end
+    // with "-new" and "-diff".  If cropping doesn't work right, you can view
+    // the full-page screenshot in the image that ends with "-full".
+    expect(pixelsChanged).withContext(name).not.toBeGreaterThan(threshold);
   }
 };
 

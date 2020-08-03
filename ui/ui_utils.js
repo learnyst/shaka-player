@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -62,7 +63,7 @@ shaka.ui.Utils = class {
    */
   static checkmarkIcon() {
     const icon = shaka.util.Dom.createHTMLElement('i');
-    icon.classList.add('material-icons');
+    icon.classList.add('material-icons-round');
     icon.classList.add('shaka-chosen-item');
     icon.textContent = shaka.ui.Enums.MaterialDesignIcons.CHECKMARK;
     // Screen reader should ignore icon text.
@@ -90,14 +91,11 @@ shaka.ui.Utils = class {
         'Do not use setDisplay with SVG elements!');
 
     if (display) {
-      element.classList.add('shaka-displayed');
       // Removing a non-existent class doesn't throw, so, even if
-      // the element is not hidden, this should be fine. Same for displayed
-      // below.
+      // the element is not hidden, this should be fine.
       element.classList.remove('shaka-hidden');
     } else {
       element.classList.add('shaka-hidden');
-      element.classList.remove('shaka-displayed');
     }
   }
 

@@ -1,18 +1,7 @@
-/**
- * @license
- * Copyright 2016 Google Inc.
- *
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License.
+/** @license
+ * Shaka Player
+ * Copyright 2016 Google LLC
+ * SPDX-License-Identifier: Apache-2.0
  */
 
 /* All of the top-level containers into which various visible features go. */
@@ -28,12 +17,13 @@
    * should be (484px vs 480px). */
   display: flex;
 
-  /* Set the fonts for all contents, with a special exception for material
-   * design icons. */
-  .material-icons {
-    font-family: 'Material Icons';
+  /* Set a special font for material design icons. */
+  .material-icons-round {
+    font-family: 'Material Icons Round';
+    font-size: 24px;
   }
 
+  /* Set the fonts for all other content. */
   * {
     font-family: Roboto-Regular, Roboto, sans-serif;
   }
@@ -197,7 +187,7 @@
   align-items: center;
 }
 
-.shaka-skim-container {
+.shaka-scrim-container {
   margin: 0;
   .fill-container();
   .shrinkable();
@@ -205,16 +195,25 @@
   .show-when-controls-shown();
 
   /* A black gradient at the bottom, behind the controls, but only so high. */
-  background: linear-gradient(to top, rgba(0, 0, 0, 1) 0, @transparent 92px);
+  background: linear-gradient(to top, rgba(0, 0, 0, 1) 0, @transparent 15%);
 }
 
 .shaka-text-container {
   .absolute-position();
 
-  bottom: 15%;
+  bottom: 0%;
   width: 100%;
   min-width: 48px;
   text-align: center;
+
+  /* When the controls fade in or out, it takes 600ms. Thus, when the text
+   * container adjusts to the presence or absence of controls, we should wait
+   * briefly, so the captions don't end up appearing behind the controls.
+   * Instead of being a gradual animation, this is a fast animation with a
+   * significant delay, since the captions moving around is a little
+   * distracting. */
+  transition: bottom cubic-bezier(0.4, 0, 0.6, 1) 100ms;
+  transition-delay: 500ms;
 
   /* Set the captions in the middle horizontally by default. */
   display: flex;
@@ -224,13 +223,17 @@
   /* Set the captions at the bottom by default. */
   justify-content: flex-end;
 
-  /* If the captions are too long to fit in the video container, hide the
-   * overflow content. */
-  overflow: hidden;
-
   /* These are defaults which are overridden by JS or cue styles. */
   font-size: 20px;
   line-height: 1.4;  // relative to font size.
+
+  /* This makes nested elements have this specific font size, too.  Without
+   * this, defaults at the app level for generic elements like <p> may be
+   * specific enough to override font size for those elements in captions. */
+  * {
+    font-size: 20px;
+    line-height: 1.4;  // relative to font size.
+  }
 
   span {
     /* These are defaults which are overridden by JS or cue styles. */
@@ -238,6 +241,21 @@
     color: rgb(255, 255, 255);
     display: inline-block;
   }
+
+  .shaka-nested-cue:not(:last-of-type):after {
+    content: " ";
+    white-space: pre;
+  }
+}
+
+.shaka-controls-container[shown="true"] ~ .shaka-text-container {
+  /* While the controls are shown, the text container should avoid the 15%
+   * at the bottom of the video, to avoid overlapping with controls. */
+  bottom: 15%;
+
+  /* Disable the transition delay when moving the captions up, so that the
+   * controls don't appear over the captions. */
+  transition-delay: 0ms;
 }
 
 /* The buffering spinner. */

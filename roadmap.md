@@ -9,24 +9,29 @@ The goals of future milestones are fluid until we begin that development cycle,
 so the exact milestone for future features is not pre-determined.
 
 Candidate features for future release cycles
- - HLS discontinuity support
- - Low-latency live (LHLS, equivalent for DASH)
  - MediaCapabilities to make performance-based decisions
  - Codec-switching
- - Background fetch for offline storage
  - Preload API
  - Thumbnail tracks
- - Own CEA parser, use mux.js only for TS
+ - Background fetch for offline storage
+ - PlayReady "recommendation" key system support
  - Smaller, more modular binary
- - IMA SDK ad integration demo
- - Ad controls in the UI
+ - Official TypeScript defs, generated from source
 
-v2.6 - 2019 Q4 (estimated)
- - Code health release
- - Finish conversion to ES6
- - Isolate DASH periods to the DASH parser
+v3.1 - 2020 Q3
+ - Low-latency live (LL-HLS, LL-DASH)
+ - Own CEA parser, use mux.js only for TS
 
 =====
+
+v3.0 - 2020 Q2
+ - Code health improvements
+ - Conversion to ES6
+ - Isolate DASH periods to the DASH parser
+ - HLS discontinuity support
+ - IMA ad SDK integration
+ - Ad controls in the UI
+ - Concurrent Storage operations
 
 v2.5 - 2019 Q2
  - Video controls UI API

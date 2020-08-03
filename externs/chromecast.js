@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -114,6 +115,20 @@ cast.receiver.CastReceiverManager = class {
 
   /** @return {boolean} */
   isSystemReady() {}
+};
+
+
+/** @const */
+cast.receiver.media = {};
+
+
+/** @enum {number} */
+cast.receiver.media.MetadataType = {
+  'GENERIC': 0,
+  'MOVIE': 1,
+  'TV_SHOW': 2,
+  'MUSIC_TRACK': 3,
+  'PHOTO': 4,
 };
 
 

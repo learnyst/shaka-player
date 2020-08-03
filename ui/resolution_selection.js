@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -6,6 +7,7 @@
 
 goog.provide('shaka.ui.ResolutionSelection');
 
+goog.require('goog.asserts');
 goog.require('shaka.ui.Enums');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
@@ -78,6 +80,11 @@ shaka.ui.ResolutionSelection = class extends shaka.ui.SettingsMenu {
     shaka.ui.Utils.setDisplay(this.button, true);
 
     tracks.sort((t1, t2) => {
+      // We have already screened for audio-only content, but the compiler
+      // doesn't know that.
+      goog.asserts.assert(t1.height != null, 'Null height');
+      goog.asserts.assert(t2.height != null, 'Null height');
+
       return t2.height - t1.height;
     });
 
@@ -115,7 +122,7 @@ shaka.ui.ResolutionSelection = class extends shaka.ui.SettingsMenu {
 
     // Add new ones
     for (const track of tracks) {
-      const button = shaka.util.Dom.createHTMLElement('button');
+      const button = shaka.util.Dom.createButton();
       button.classList.add('explicit-resolution');
       this.eventManager.listen(button, 'click',
           () => this.onTrackSelected_(track));
@@ -135,7 +142,7 @@ shaka.ui.ResolutionSelection = class extends shaka.ui.SettingsMenu {
     }
 
     // Add the Auto button
-    const autoButton = shaka.util.Dom.createHTMLElement('button');
+    const autoButton = shaka.util.Dom.createButton();
     autoButton.classList.add('shaka-enable-abr-button');
     this.eventManager.listen(autoButton, 'click', () => {
       const config = {abr: {enabled: true}};

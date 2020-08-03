@@ -17,8 +17,8 @@ const config = {
 ui.configure(config);
 ```
 
-Controls will fire a {@link shaka.Controls.UIUpdatedEvent} event once the config
-takes effect.
+Controls will fire a {@link shaka.ui.Controls.UIUpdatedEvent} event once the
+config takes effect.
 See the docs for {@link shaka.extern.UIConfiguration} for more information.
 
 #### Customizing the number and order of controls
@@ -73,6 +73,10 @@ The following buttons can be added to the overflow menu:
 * language: adds a button that controls audio language selection.
 * picture_in_picture: adds a button that enables/disables picture-in-picture mode on browsers
   that support it. Button is invisible on other browsers.
+* loop: adds a button that controls if the currently selected video is played in a loop.
+* playback_rate: adds a button that controls the playback rate selection.
+* airplay: adds a button that opens a AirPlay dialog. The button is visible only if the browser
+  supports AirPlay.
 <!-- TODO: If we add more buttons that can be put in the order this way, list them here. -->
 
 Example:
@@ -94,11 +98,30 @@ UI layout can be reconfigured at any point after it's been created.
 Please note that custom layouts might need CSS adjustments to look good.
 
 #### Changing seek bar progress colors
-<!-- TODO: Is there a better way to do this? (The actual thing, not the tutorial) -->
 The seek bar consists of three segments: past (already played part of the presentation),
-future-buffered and future-unbuffered. The segments colors are set when the seek bar is created.
-To customize the colors, change the values of `shaka.ui.Constants.SEEK_BAR_BASE_COLOR` ,
-`shaka.ui.Constants.SEEK_BAR_PLAYED_COLOR`, and `shaka.ui.Constants.SEEK_BAR_BUFFERED_COLOR` in ui/controls.js
+future-buffered and future-unbuffered.
+To customize the colors, add your values to the config object under `seekBarColors`:
+ ```js
+const config = {
+  'seekBarColors': {
+    base: 'rgba(255, 255, 255, 0.3)',
+    buffered: 'rgba(255, 255, 255, 0.54)',
+    played: 'rgb(255, 255, 255)',
+  }
+}
+ui.configure(config);
+```
+
+If you're using our ad API, you can also specify the color for the ad break markers on
+the timeline:
+ ```js
+const config = {
+  'seekBarColors': {
+    adBreaks: 'rgb(255, 204, 0)',
+  }
+}
+ui.configure(config);
+```
 
 
 #### Creating custom elements and adding them to the UI
@@ -126,7 +149,7 @@ myapp.SkipButton = class extends shaka.ui.Element {
 
     // Listen for clicks on the button to start the next playback
     this.eventManager.listen(this.button_, 'click', () => {
-      let nextManifest = /* Your logic to pick the next video to be played */
+      const nextManifest = /* Your logic to pick the next video to be played */
         myapp.getNextManifest();
 
       // shaka.ui.Element gives us access to the player object as member of the class

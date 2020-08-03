@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -77,6 +78,8 @@ shaka.ui.TextSelection = class extends shaka.ui.SettingsMenu {
     this.updateLocalizedStrings_();
 
     this.updateTextLanguages_();
+
+    this.onTracksChanged_();
   }
 
 
@@ -84,7 +87,7 @@ shaka.ui.TextSelection = class extends shaka.ui.SettingsMenu {
    * @private
    */
   addOffOption_() {
-    const off = shaka.util.Dom.createHTMLElement('button');
+    const off = shaka.util.Dom.createButton();
     off.setAttribute('aria-selected', 'true');
     this.menu.appendChild(off);
 
@@ -129,11 +132,10 @@ shaka.ui.TextSelection = class extends shaka.ui.SettingsMenu {
         this.controls.getConfig().trackLabelFormat);
 
     // Add the Off button
-    const offButton = shaka.util.Dom.createHTMLElement('button');
+    const offButton = shaka.util.Dom.createButton();
     offButton.classList.add('shaka-turn-captions-off-button');
     this.eventManager.listen(offButton, 'click', () => {
-      const p = this.player.setTextTrackVisibility(false);
-      p.catch(() => {});  // TODO(#1993): Handle possible errors.
+      this.player.setTextTrackVisibility(false);
       this.updateTextLanguages_();
     });
 
@@ -162,10 +164,13 @@ shaka.ui.TextSelection = class extends shaka.ui.SettingsMenu {
    * @private
    */
   async onTextTrackSelected_(track) {
+    // setTextTrackVisibility should be called after selectTextLanguage.
+    // selectTextLanguage sets a text stream, and setTextTrackVisiblity(true)
+    // will set a text stream if it isn't already set. Consequently, reversing
+    // the order of these calls makes two languages display simultaneously
+    // if captions are turned off -> on in a different language.
+    this.player.selectTextLanguage(track.language, track.roles[0]);
     await this.player.setTextTrackVisibility(true);
-    if (this.player) {  // May have become null while awaiting
-      this.player.selectTextLanguage(track.language, track.roles[0]);
-    }
   }
 
 

@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -142,7 +143,6 @@ describe('AdaptationSet', () => {
       allowedByKeySystem: true,
       audio: audio,
       bandwidth: 1024,
-      drmInfos: [],
       id: id,
       language: '',
       primary: false,
@@ -166,9 +166,10 @@ describe('AdaptationSet', () => {
       createSegmentIndex: () => Promise.resolve(),
       emsgSchemeIdUris: null,
       encrypted: false,
+      drmInfos: [],
       segmentIndex: null,
       id: id,
-      keyId: null,
+      keyIds: new Set(),
       label: null,
       language: '',
       mimeType: mimeType,

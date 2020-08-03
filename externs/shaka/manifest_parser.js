@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -99,8 +100,7 @@ shaka.extern.ManifestParser = class {
 /**
  * @typedef {{
  *   networkingEngine: !shaka.net.NetworkingEngine,
- *   filterNewPeriod: function(shaka.extern.Period),
- *   filterAllPeriods: function(!Array.<!shaka.extern.Period>),
+ *   filter: function(shaka.extern.Manifest):!Promise,
  *   onTimelineRegionAdded: function(shaka.extern.TimelineRegionInfo),
  *   onEvent: function(!Event),
  *   onError: function(!shaka.util.Error)
@@ -114,10 +114,9 @@ shaka.extern.ManifestParser = class {
  *
  * @property {!shaka.net.NetworkingEngine} networkingEngine
  *   The networking engine to use for network requests.
- * @property {function(shaka.extern.Period)} filterNewPeriod
- *   Should be called on a new Period so that it can be filtered.
- * @property {function(!Array.<!shaka.extern.Period>)} filterAllPeriods
- *   Should be called on all Periods so that they can be filtered.
+ * @property {function(shaka.extern.Manifest):!Promise} filter
+ *   Should be called when new variants or text streams are added to the
+ *   Manifest.  Note that this operation is asynchronous.
  * @property {function(shaka.extern.TimelineRegionInfo)} onTimelineRegionAdded
  *   Should be called when a new timeline region is added.
  * @property {function(!Event)} onEvent
@@ -130,11 +129,10 @@ shaka.extern.ManifestParser.PlayerInterface;
 
 
 /**
- * A factory for creating the manifest parser.  This will be called with 'new'.
- * This function is registered with shaka.media.ManifestParser to create parser
- * instances.
+ * A factory for creating the manifest parser.  This function is registered with
+ * shaka.media.ManifestParser to create parser instances.
  *
- * @typedef {function(new:shaka.extern.ManifestParser)}
+ * @typedef {function():!shaka.extern.ManifestParser}
  * @exportDoc
  */
 shaka.extern.ManifestParser.Factory;

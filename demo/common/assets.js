@@ -1,5 +1,6 @@
 // vim: foldmethod=marker:foldmarker={{{,}}}
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -18,13 +19,11 @@ const shakaAssets = {};
 
 /** @enum {shakaDemo.MessageIds} */
 shakaAssets.Source = {
-  UNKNOWN: shakaDemo.MessageIds.UNKNOWN,
   CUSTOM: shakaDemo.MessageIds.CUSTOM,
   SHAKA: shakaDemo.MessageIds.SHAKA,
   AXINOM: shakaDemo.MessageIds.AXINOM,
   UNIFIED_STREAMING: shakaDemo.MessageIds.UNIFIED_STREAMING,
   DASH_IF: shakaDemo.MessageIds.DASH_IF,
-  WOWZA: shakaDemo.MessageIds.WOWZA,
   BITCODIN: shakaDemo.MessageIds.BITCODIN,
   NIMBLE_STREAMER: shakaDemo.MessageIds.NIMBLE_STREAMER,
   AZURE_MEDIA_SERVICES: shakaDemo.MessageIds.AZURE_MEDIA_SERVICES,
@@ -96,7 +95,8 @@ shakaAssets.Feature = {
   AUDIO_ONLY: shakaDemo.MessageIds.AUDIO_ONLY,
   // Set if the asset can be stored offline.
   OFFLINE: shakaDemo.MessageIds.OFFLINE,
-  // A synthetic property used in the search tab. Should not be given to assets.
+  // A synthetic property used in the "all content" tab. Should not be given to
+  // assets.
   STORED: shakaDemo.MessageIds.STORED,
   // Set if the asset has ads. Autoset by calling setAdTagUri() on an asset.
   // Does not need to be set manually.
@@ -104,6 +104,8 @@ shakaAssets.Feature = {
 
   // Set if the asset is a livestream.
   LIVE: shakaDemo.MessageIds.LIVE,
+  // A synthetic property used if the asset is VOD (not-livestream).
+  VOD: shakaDemo.MessageIds.VOD,
   // Set if the asset has at least one WebM stream.
   WEBM: shakaDemo.MessageIds.WEBM,
   // Set if the asset has at least one mp4 stream.
@@ -147,6 +149,26 @@ shakaAssets.Feature = {
  *   (optional) The codecs string, if needed to refine the MIME type.
  */
 shakaAssets.ExtraText;
+
+
+/**
+ * @typedef {{
+ *   contentSourceId: string,
+ *   videoId: string,
+ *   assetKey: string,
+ * }}
+ *
+ * @property {string} contentSourceId
+ *   Content source id of the asset in Google's Video Ad Manager system.
+ *   Only for VOD assets.
+ * @property {string} videoId
+ *   Video source id of the asset in Google's Video Ad Manager system.
+ *   Only for VOD assets.
+ * @property {string} assetKey
+ *   Asset key of the asset in Google's Video Ad Manager system.
+ *   Only for LIVE assets.
+ */
+shakaAssets.IMAIds;
 // End types and enums }}}
 
 
@@ -459,6 +481,20 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.WEBM)
       .addFeature(shakaAssets.Feature.OFFLINE),
   new ShakaDemoAssetInfo(
+      /* name= */ 'Tears of Steel (HLS, Server Side ads)',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/tears_of_steel.png',
+      /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/tos/hls.m3u8',
+      /* source= */ shakaAssets.Source.SHAKA)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.HIGH_DEFINITION)
+      .addFeature(shakaAssets.Feature.MP4)
+      .addFeature(shakaAssets.Feature.OFFLINE)
+      .setIMAIds({
+        contentSourceId: '2528370',
+        videoId: 'tears-of-steel',
+        assetKey: '',
+      }),
+  new ShakaDemoAssetInfo(
       /* name= */ 'Tears of Steel (multicodec, surround + stereo)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/tears_of_steel.png',
       /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/tos-surround/dash.mpd',
@@ -577,6 +613,7 @@ shakaAssets.testAssets = [
       /* manifestUri= */ 'https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.mpd',
       /* source= */ shakaAssets.Source.AXINOM)
       // Disabled pending resolution of https://github.com/Axinom/public-test-vectors/issues/16
+      // Disabled pending resolution of https://github.com/Axinom/public-test-vectors/issues/17
       .markAsDisabled()
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4)
@@ -586,6 +623,8 @@ shakaAssets.testAssets = [
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/axinom_test.png',
       /* manifestUri= */ 'https://akamai-axtest.akamaized.net/routes/lapd-v1-acceptance/www_c4/Manifest.m3u8',
       /* source= */ shakaAssets.Source.AXINOM)
+      // Disabled pending resolution of https://github.com/Axinom/public-test-vectors/issues/17
+      .markAsDisabled()
       .addFeature(shakaAssets.Feature.HLS)
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4),
@@ -666,22 +705,18 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.MP4)
       .addFeature(shakaAssets.Feature.DASH),
   new ShakaDemoAssetInfo(
-      /* name= */ 'Live sim SegmentTimeline w $Time$ (6s segments)',
+      /* name= */ 'Live sim SegmentTimeline w/ $Time$ (6s segments)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/dash_if_test_pattern.png',
       /* manifestUri= */ 'https://livesim.dashif.org/livesim/segtimeline_1/utc_head/testpic_6s/Manifest.mpd',
       /* source= */ shakaAssets.Source.DASH_IF)
-      // Disabled pending resolution of https://github.com/Dash-Industry-Forum/dash-live-source-simulator/issues/91
-      .markAsDisabled()
       .addFeature(shakaAssets.Feature.DASH)
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4),
   new ShakaDemoAssetInfo(
-      /* name= */ 'Live sim SegmentTimeline w $Number$ (6s segments)',
+      /* name= */ 'Live sim SegmentTimeline w/ $Number$ (6s segments)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/dash_if_test_pattern.png',
       /* manifestUri= */ 'https://livesim.dashif.org/livesim/segtimelinenr_1/utc_head/testpic_6s/Manifest.mpd',
       /* source= */ shakaAssets.Source.DASH_IF)
-      // Disabled pending resolution of https://github.com/Dash-Industry-Forum/dash-live-source-simulator/issues/91
-      .markAsDisabled()
       .addFeature(shakaAssets.Feature.DASH)
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4),
@@ -715,19 +750,15 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.DASH)
       .addFeature(shakaAssets.Feature.SUBTITLES)
       .addFeature(shakaAssets.Feature.MP4),
-  // End DASH-IF Assets }}}
-
-  // Wowza assets {{{
-  // Src: http://www.dash-player.com/demo/streaming-server-and-encoder-support/
   new ShakaDemoAssetInfo(
-      /* name= */ 'Big Buck Bunny (Live)',
-      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/big_buck_bunny.png',
-      /* manifestUri= */ 'https://wowzaec2demo.streamlock.net/live/bigbuckbunny/manifest_mpm4sav_mvtime.mpd',
-      /* source= */ shakaAssets.Source.WOWZA)
+      /* name= */ 'Low Latency DASH Live',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/dash_if_test_pattern.png',
+      /* manifestUri= */ 'https://vm2.dashif.org/livesim-chunked/chunkdur_1/ato_7/testpic4_8s/Manifest300.mpd',
+      /* source= */ shakaAssets.Source.SHAKA)
       .addFeature(shakaAssets.Feature.DASH)
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4),
-  // End Wowza assets }}}
+  // End DASH-IF Assets }}}
 
   // bitcodin assets {{{
   // Src: http://www.dash-player.com/demo/streaming-server-and-encoder-support/
@@ -1000,6 +1031,14 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.MP2TS)
       .addFeature(shakaAssets.Feature.CAPTIONS)
       .addFeature(shakaAssets.Feature.OFFLINE),
+  new ShakaDemoAssetInfo(
+      /* name= */ 'Low Latency HLS Live',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/apple_test_pattern.png',
+      /* manifestUri= */ 'https://ll-hls-test.apple.com/cmaf/master.m3u8',
+      /* source= */ shakaAssets.Source.APPLE)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.LIVE)
+      .addFeature(shakaAssets.Feature.MP4),
   // }}}
 
   // IRT assets {{{

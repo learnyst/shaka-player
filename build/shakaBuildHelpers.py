@@ -1,4 +1,4 @@
-# Copyright 2016 Google Inc.  All Rights Reserved.
+# Copyright 2016 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -223,8 +223,27 @@ def calculate_version():
     return npm_version(is_dirty=True)
 
 
+def get_closure_base_js_path():
+  return os.path.join(get_source_base(),
+      'node_modules', 'google-closure-library', 'closure', 'goog', 'base.js')
+
+
+def get_all_js_files(*path_components):
+  """Get all JavaScript file paths recursively from the given path components.
+
+  Args:
+    *path_components: The components of the path to search.  Joining is handling
+    internally according to os path semantics.
+  Returns:
+    An array of absolute paths to all JS files.
+  """
+  match = re.compile(r'.*\.js$')
+  return get_all_files(
+      os.path.join(get_source_base(), *path_components), match)
+
+
 def get_all_files(dir_path, exp=None):
-  """Returns an array of absolute paths to all the files at the given path.
+  """Get all file paths recursively within the given path.
 
   This optionally will filter the output using the given regex.
 

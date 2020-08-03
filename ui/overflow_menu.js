@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -79,6 +80,16 @@ shaka.ui.OverflowMenu = class extends shaka.ui.Element {
           this.updateAriaLabel_();
         });
 
+    this.eventManager.listen(
+        this.adManager, shaka.ads.AdManager.AD_STARTED, () => {
+          shaka.ui.Utils.setDisplay(this.overflowMenuButton_, false);
+        });
+
+    this.eventManager.listen(
+        this.adManager, shaka.ads.AdManager.AD_STOPPED, () => {
+          shaka.ui.Utils.setDisplay(this.overflowMenuButton_, true);
+        });
+
 
     this.eventManager.listen(
         this.controls, 'submenuopen', () => {
@@ -101,7 +112,7 @@ shaka.ui.OverflowMenu = class extends shaka.ui.Element {
     this.eventManager.listen(
         this.controlsContainer_, 'touchstart', (event) => {
         // If the overflow menu is showing, hide it on a touch event
-          if (this.overflowMenu_.classList.contains('shaka-displayed')) {
+          if (!this.overflowMenu_.classList.contains('shaka-hidden')) {
             shaka.ui.Utils.setDisplay(this.overflowMenu_, false);
             // Stop this event from becoming a click event.
             event.preventDefault();
@@ -143,6 +154,7 @@ shaka.ui.OverflowMenu = class extends shaka.ui.Element {
     this.overflowMenu_.classList.add('shaka-no-propagation');
     this.overflowMenu_.classList.add('shaka-show-controls-on-mouse-over');
     this.overflowMenu_.classList.add('shaka-settings-menu');
+    this.overflowMenu_.classList.add('shaka-hidden');
     this.controlsContainer_.appendChild(this.overflowMenu_);
   }
 
@@ -151,11 +163,11 @@ shaka.ui.OverflowMenu = class extends shaka.ui.Element {
    * @private
    */
   addOverflowMenuButton_() {
-    /** @private {!HTMLElement} */
-    this.overflowMenuButton_ = shaka.util.Dom.createHTMLElement('button');
+    /** @private {!HTMLButtonElement} */
+    this.overflowMenuButton_ = shaka.util.Dom.createButton();
     this.overflowMenuButton_.classList.add('shaka-overflow-menu-button');
     this.overflowMenuButton_.classList.add('shaka-no-propagation');
-    this.overflowMenuButton_.classList.add('material-icons');
+    this.overflowMenuButton_.classList.add('material-icons-round');
     this.overflowMenuButton_.textContent =
       shaka.ui.Enums.MaterialDesignIcons.OPEN_OVERFLOW;
     this.parent.appendChild(this.overflowMenuButton_);

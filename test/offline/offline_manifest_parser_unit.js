@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -198,11 +199,12 @@ filterDescribe('OfflineManifestParser', offlineManifestParserSupport, () => {
 
     /** @type {shaka.extern.ManifestDB} */
     const manifest = {
+      creationTime: Date.now(),
       originalManifestUri: '',
       duration: 600 * seconds,
       size: 100 * mb,
       expiration: Infinity,
-      periods: [],
+      streams: [],
       sessionIds: [sessionId],
       drmInfo: null,
       appMetadata: {},

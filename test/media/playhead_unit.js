@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -58,7 +59,8 @@ let PlayingTestInfo;
  *   seekTo: number,
  *   expectedEndTime: number,
  *   expectEvent: boolean,
- *   jumpLargeGaps: (boolean|undefined)
+ *   jumpLargeGaps: (boolean|undefined),
+ *   preventDefault: (boolean|undefined)
  * }}
  *
  * @description
@@ -83,6 +85,8 @@ let PlayingTestInfo;
  *   If true, expect the 'largegap' event to be fired.
  * @property {(boolean|undefined)} jumpLargeGaps
  *   If given, set this field of the Playhead configuration.
+ * @property {(boolean|undefined)} preventDefault
+ *   If true, call preventDefault() on the 'largegap' event.
  */
 let SeekTestInfo;
 
@@ -135,7 +139,8 @@ describe('Playhead', () => {
     timeline.setDuration.and.throwError(new Error());
 
     manifest = {
-      periods: [],
+      variants: [],
+      textStreams: [],
       presentationTimeline: timeline,
       minBufferTime: 10,
       offlineSessionIds: [],

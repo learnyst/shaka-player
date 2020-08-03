@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -79,7 +80,7 @@ shaka.ui.LanguageUtils = class {
       }
       combinationsMade.add(combinationName);
 
-      const button = shaka.util.Dom.createHTMLElement('button');
+      const button = shaka.util.Dom.createButton();
       button.addEventListener('click', () => {
         onTrackSelected(track);
       });

@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -19,8 +20,8 @@ shakaDemo.Front = class {
    * Register the page configuration.
    */
   static init() {
-    const container = shakaDemoMain.addNavButton('front');
-    shakaDemoFront = new shakaDemo.Front(container);
+    const elements = shakaDemoMain.addNavButton('front');
+    shakaDemoFront = new shakaDemo.Front(elements.container);
   }
 
   /** @param {!Element} container */

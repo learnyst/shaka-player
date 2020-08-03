@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -56,7 +57,7 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
         'test', shaka.test.TestScheme.plugin);
     shaka.media.ManifestParser.registerParserByMime(
         'application/x-test-manifest',
-        shaka.test.TestScheme.ManifestParser);
+        shaka.test.TestScheme.ManifestParser.factory);
 
     await shaka.test.TestScheme.createManifests(shaka, '');
     support = await shaka.media.DrmEngine.probeSupport();
@@ -131,6 +132,11 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
     drmIt('sends reasonably-sized updates', async () => {
       // Use an encrypted asset, to make sure DRM info doesn't balloon the size.
       fakeInitState.manifest = 'test:sintel-enc';
+      fakeInitState.player.configure['drm'] = {
+        'servers': {
+          'com.widevine.alpha': 'https://cwip-shaka-proxy.appspot.com/no_auth',
+        },
+      };
 
       const p = waitForLoadedData();
 
@@ -154,6 +160,11 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
     drmIt('has reasonable average message size', async () => {
       // Use an encrypted asset, to make sure DRM info doesn't balloon the size.
       fakeInitState.manifest = 'test:sintel-enc';
+      fakeInitState.player.configure['drm'] = {
+        'servers': {
+          'com.widevine.alpha': 'https://cwip-shaka-proxy.appspot.com/no_auth',
+        },
+      };
 
       const p = waitForLoadedData();
 
@@ -186,7 +197,7 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
     // at each stage, the cast receiver can form an update message without
     // causing an error.
     waitForUpdateMessageWrapper(
-        shaka.media.ManifestParser, 'ManifestParser', 'create');
+        shaka.media.ManifestParser, 'ManifestParser', 'getFactory');
     waitForUpdateMessageWrapper(
         // eslint-disable-next-line no-restricted-syntax
         shaka.test.TestScheme.ManifestParser.prototype, 'ManifestParser',
@@ -265,6 +276,13 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
       CastReceiverManager: {
         getInstance: () => mockReceiverManager,
       },
+      media: {
+        // Defined by the SDK, but we aren't loading it here.
+        MetadataType: {
+          GENERIC: 0,
+          MUSIC_TRACK: 3,
+        },
+      },
     };
   }
 
@@ -329,8 +347,8 @@ filterDescribe('CastReceiver', castReceiverIntegrationSupport, () => {
   }
 
   /**
-   * @param {?} message
-   * @param {!Object} bus
+   * @param {*} message
+   * @param {!cast.receiver.CastMessageBus} bus
    * @param {string=} senderId
    */
   function fakeIncomingMessage(message, bus, senderId) {

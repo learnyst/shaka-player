@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -41,22 +42,25 @@ describe('Transmuxer', () => {
   });
 
   describe('isSupported', () => {
-    const isSupported = shaka.media.Transmuxer.isSupported;
+    const Transmuxer = shaka.media.Transmuxer;
+
     it('returns whether the content type is supported', () => {
-      expect(isSupported(mp4MimeType, ContentType.VIDEO)).toBeFalsy();
-      expect(isSupported(transportStreamVideoMimeType, ContentType.VIDEO))
-          .toBe(true);
+      expect(Transmuxer.isSupported(
+          mp4MimeType, ContentType.VIDEO)).toBe(false);
+      expect(Transmuxer.isSupported(
+          transportStreamVideoMimeType, ContentType.VIDEO)).toBe(true);
     });
 
     // Issue #1991
     it('handles upper-case MIME types', () => {
       const mimeType = transportStreamVideoMimeType.replace('mp2t', 'MP2T');
-      expect(isSupported(mimeType, ContentType.VIDEO)).toBe(true);
+      expect(Transmuxer.isSupported(mimeType, ContentType.VIDEO)).toBe(true);
     });
   });
 
   describe('convertTsCodecs', () => {
-    const convertTsCodecs = shaka.media.Transmuxer.convertTsCodecs;
+    const convertTsCodecs =
+        (type, codecs) => shaka.media.Transmuxer.convertTsCodecs(type, codecs);
 
     it('returns converted codecs', () => {
       const convertedVideoCodecs =
@@ -150,9 +154,9 @@ describe('Transmuxer', () => {
             goog.asserts.assert(
                 box.version == 0 || box.version == 1,
                 'TFDT version can only be 0 or 1');
-            mp4Timestamp = (box.version == 0) ?
-                box.reader.readUint32() :
-                box.reader.readUint64();
+            const parsedTFDTBox = shaka.util.Mp4BoxParsers.parseTFDT(
+                box.reader, box.version);
+            mp4Timestamp = parsedTFDTBox.baseMediaDecodeTime;
             parsed = true;
           })
           .parse(transmuxedData.data);

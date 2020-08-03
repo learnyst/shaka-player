@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -154,12 +155,8 @@ jasmine.Matchers.prototype.toHaveBeenCalledTimes = function(times) {};
 jasmine.Matchers.prototype.toMatch = function(value) {};
 
 
-/** @param {*} value */
+/** @param {*=} value */
 jasmine.Matchers.prototype.toThrow = function(value) {};
-
-
-/** @param {*} value */
-jasmine.Matchers.prototype.toThrowError = function(value) {};
 
 
 /**
@@ -227,7 +224,7 @@ jasmine.SpyStrategy = function() {};
 
 /**
  * @param {...*} varArgs
- * @return {*}
+ * @return {?}
  */
 jasmine.SpyStrategy.prototype.exec = function(varArgs) {};
 
@@ -275,15 +272,15 @@ jasmine.SpyStrategy.prototype.stub = function() {};
 jasmine.CallContext = function() {};
 
 
-/** @const {*} */
+/** @const {?} */
 jasmine.CallContext.prototype.object;
 
 
-/** @const {!Array.<*>} */
+/** @const {!Array.<?>} */
 jasmine.CallContext.prototype.args;
 
 
-/** @const {*} */
+/** @const {?} */
 jasmine.CallContext.prototype.returnValue;
 
 
@@ -304,12 +301,12 @@ jasmine.CallTracker.prototype.count = function() {};
 
 /**
  * @param {number} i
- * @return {!Array.<*>}
+ * @return {!Array.<?>}
  */
 jasmine.CallTracker.prototype.argsFor = function(i) {};
 
 
-/** @return {!Array.<!Array.<*>>} */
+/** @return {!Array.<!Array.<?>>} */
 jasmine.CallTracker.prototype.allArgs = function() {};
 
 
@@ -379,9 +376,13 @@ jasmine.any = function(factory) {};
 jasmine.anything = function() {};
 
 
+/** @typedef {{ sample: ? }} */
+jasmine.ObjectContainingType;
+
+
 /**
  * @param {!Object} value
- * @return {!Object}
+ * @return {jasmine.ObjectContainingType}
  */
 jasmine.objectContaining = function(value) {};
 
@@ -394,11 +395,24 @@ jasmine.stringMatching = function(value) {};
 
 
 /**
- * @param {!Array.<T>} value
+ * Matches an Array containing all of the values specified, in any order.
+ *
+ * @param {!Array.<T>} values
  * @return {!Array.<T>}
  * @template T
  */
-jasmine.arrayContaining = function(value) {};
+jasmine.arrayContaining = function(values) {};
+
+
+/**
+ * Matches an Array with exactly the values specified, no more, no less, in any
+ * order.
+ *
+ * @param {!Array.<T>} values
+ * @return {!Array.<T>}
+ * @template T
+ */
+jasmine.arrayWithExactContents = function(values) {};
 
 
 /**
@@ -653,6 +667,7 @@ jasmine.matchersUtil = {};
 /**
  * @param {*} first
  * @param {*} second
+ * @param {*} customEqualityTesters
  * @return {boolean}
  */
-jasmine.matchersUtil.equals = function(first, second) {};
+jasmine.matchersUtil.equals = function(first, second, customEqualityTesters) {};

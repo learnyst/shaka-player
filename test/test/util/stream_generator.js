@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -40,19 +41,13 @@ shaka.test.IStreamGenerator = class {
    * Gets one of the stream's segments.
    * The IStreamGenerator must be initialized.
    *
-   * @param {number} position The segment's position within a particular Period
-   *   p.
-   * @param {number} segmentOffset The number of segments in all Periods that
-   *   came before Period p.
+   * @param {number} position The segment's position.
    * @param {number} wallClockTime The wall-clock time in seconds.
-   * @example getSegment(1, 0) gets the 1st segment in the stream,
-   *   and getSegment(2, 5) gets the 2nd segment in a Period that starts
-   *   at the 6th segment (relative to the very start of the stream).
    *
    * @return {ArrayBuffer} The segment if the stream has started, and the
    *   segment exists and is available; otherwise, return null.
    */
-  getSegment(position, segmentOffset, wallClockTime) {}
+  getSegment(position, wallClockTime) {}
 };
 
 /**
@@ -85,13 +80,12 @@ shaka.test.TSVodStreamGenerator = class {
   }
 
   /** @override */
-  getSegment(position, segmentOffset, wallClockTime) {
+  getSegment(position, wallClockTime) {
     goog.asserts.assert(
         this.segment_,
         'init() must be called before getSegment().');
     // TODO: complete implementation; this should change the timestamps based on
-    // the given segmentOffset and wallClockTime, so as to simulate a long
-    // stream.
+    // the given wallClockTime, so as to simulate a long stream.
     return this.segment_;
   }
 };
@@ -170,7 +164,7 @@ shaka.test.Mp4VodStreamGenerator = class {
   }
 
   /** @override */
-  getSegment(position, segmentOffset, wallClockTime) {
+  getSegment(position, wallClockTime) {
     goog.asserts.assert(
         this.segmentTemplate_,
         'init() must be called before getSegment().');
@@ -178,11 +172,11 @@ shaka.test.Mp4VodStreamGenerator = class {
       return null;
     }
 
-    // |position| must be an integer and >= 1.
-    goog.asserts.assert((position % 1 === 0) && (position >= 1),
-        'segment number must be an integer >= 1');
+    // |position| must be an integer and >= 0.
+    goog.asserts.assert((position % 1 === 0) && (position >= 0),
+        'segment number must be an integer >= 0');
 
-    const segmentStartTime = (position - 1) * this.segmentDuration_;
+    const segmentStartTime = position * this.segmentDuration_;
 
     return shaka.test.StreamGenerator.setBaseMediaDecodeTime_(
         this.segmentTemplate_, this.tfdtOffset_, segmentStartTime,
@@ -292,7 +286,7 @@ shaka.test.Mp4LiveStreamGenerator = class {
   }
 
   /** @override */
-  getSegment(position, segmentOffset, wallClockTime) {
+  getSegment(position, wallClockTime) {
     goog.asserts.assert(
         this.initSegment_,
         'init() must be called before getSegment().');
@@ -300,17 +294,16 @@ shaka.test.Mp4LiveStreamGenerator = class {
       return null;
     }
 
-    // |position| must be an integer and >= 1.
-    goog.asserts.assert((position % 1 === 0) && (position >= 1),
-        'segment number must be an integer >= 1');
+    // |position| must be an integer and >= 0.
+    goog.asserts.assert((position % 1 === 0) && (position >= 0),
+        'segment number must be an integer >= 0');
 
-    const segmentStartTime = (position - 1) * this.segmentDuration_;
+    const segmentStartTime = position * this.segmentDuration_;
 
     // Compute the segment's availability start time and end time.
     // (See section 5.3.9.5.3 of the DASH spec.)
     const segmentAvailabilityStartTime = this.availabilityStartTime_ +
                                        segmentStartTime +
-                                       (segmentOffset * this.segmentDuration_) +
                                        this.segmentDuration_;
     const segmentAvailabiltyEndTime = segmentAvailabilityStartTime +
                                     this.segmentDuration_ +
@@ -337,8 +330,7 @@ shaka.test.Mp4LiveStreamGenerator = class {
     // 0.
     const artificialPresentationTimeOffset =
         this.broadcastStartTime_ - this.availabilityStartTime_;
-    const mediaTimestamp = segmentStartTime +
-                         artificialPresentationTimeOffset;
+    const mediaTimestamp = segmentStartTime + artificialPresentationTimeOffset;
 
     return shaka.test.StreamGenerator.setBaseMediaDecodeTime_(
         /** @type {!ArrayBuffer} */ (this.segmentTemplate_), this.tfdtOffset_,

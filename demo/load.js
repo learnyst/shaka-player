@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -65,6 +66,10 @@ function shakaUncompiledModeSupported() {
     // before the 'load' event fires.
     script.async = false;  // eslint-disable-line id-blacklist
     document.head.appendChild(script);
+
+    // Signal success, or else the Closure Library's loader will not load the
+    // next script.
+    return true;
   }
 
   window.CLOSURE_IMPORT_SCRIPT = importScript;

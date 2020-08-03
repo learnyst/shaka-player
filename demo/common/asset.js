@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -48,7 +49,7 @@ const ShakaDemoAssetInfo = class {
     /** @type {!Array.<!shakaAssets.KeySystem>} */
     this.drm = [shakaAssets.KeySystem.CLEAR];
     /** @type {!Array.<!shakaAssets.Feature>} */
-    this.features = [];
+    this.features = [shakaAssets.Feature.VOD];
     /** @type {!Map.<string, string>} */
     this.licenseServers = new Map();
     /** @type {!Map.<string, string>} */
@@ -57,14 +58,14 @@ const ShakaDemoAssetInfo = class {
     this.requestFilter = null;
     /** @type {?shaka.extern.ResponseFilter} */
     this.responseFilter = null;
-    /** @type {?shaka.extern.DashContentProtectionCallback} */
-    this.drmCallback = null; // TODO: Setter method?
     /** @type {!Map.<string, string>} */
     this.clearKeys = new Map(); // TODO: Setter method?
     /** @type {?Object} */
     this.extraConfig = null;
     /** @type {?string} */
     this.adTagUri = null;
+    /** @type {?shakaAssets.IMAIds} */
+    this.imaIds = null;
 
     // Offline storage values.
     /** @type {?function()} */
@@ -117,6 +118,11 @@ const ShakaDemoAssetInfo = class {
    * @return {!ShakaDemoAssetInfo}
    */
   addFeature(feature) {
+    const Feature = shakaAssets.Feature;
+    if (feature == Feature.LIVE) {
+      // Unmark this feature as being VOD.
+      this.features = this.features.filter((feature) => feature != Feature.VOD);
+    }
     this.features.push(feature);
     // Sort the features list, so that features are in a predictable order.
     this.features.sort(ShakaDemoAssetInfo.caseLessAlphaComparator_);
@@ -186,6 +192,16 @@ const ShakaDemoAssetInfo = class {
    */
   setAdTagUri(uri) {
     this.adTagUri = uri;
+    this.addFeature(shakaAssets.Feature.ADS);
+    return this;
+  }
+
+  /**
+   * @param {shakaAssets.IMAIds} imaIds
+   * @return {!ShakaDemoAssetInfo}
+   */
+  setIMAIds(imaIds) {
+    this.imaIds = imaIds;
     this.addFeature(shakaAssets.Feature.ADS);
     return this;
   }
@@ -308,9 +324,6 @@ const ShakaDemoAssetInfo = class {
       this.licenseServers.forEach((value, key) => {
         config.drm.servers[key] = value;
       });
-    }
-    if (this.drmCallback) {
-      config.manifest.dash.customScheme = this.drmCallback;
     }
     if (this.clearKeys.size) {
       config.drm.clearKeys = {};

@@ -39,7 +39,7 @@ For details on what's coming next, see our [development roadmap](roadmap.md).
 |Tizen TV³  | -        | -       | -       | -       | -        | -      |**Y**|
 
 NOTES:
- - ¹: On macOS, only Safari 11+ is supported.  On iOS, only iOS 12+ is
+ - ¹: On macOS, only Safari 12+ is supported.  On iOS, only iOS 12+ is
    supported.  Older versions will be rejected.
  - ²: The latest stable Chromecast firmware is tested. Both sender and receiver
    can be implemented with Shaka Player.
@@ -47,7 +47,7 @@ NOTES:
    team. Tizen 2016 model is community-supported and untested by us.
  - ⁴: IE 11 offers PlayReady support on Windows 8.1 and Windows 10 only. IE 11
    can play clear content on Windows 8.0. IE 11 does not support adaptive
-   playback on Windows 7 and under.  (IE support will stop in v2.7:
+   playback on Windows 7 and under.  (IE support will stop in v3.1:
    https://github.com/google/shaka-player/issues/2339)
  - ⁵: These are expected to work, but are not actively tested by the Shaka
    Player team.
@@ -112,7 +112,7 @@ HLS features supported:
  - VOD, Live, and Event types
  - Encrypted content with Widevine
  - ISO-BMFF / MP4 / CMAF support
- - MPEG-2 TS support (transmuxing provided by [mux.js][] v5.1.3+, must be
+ - MPEG-2 TS support (transmuxing provided by [mux.js][] v5.6.3+, must be
    separately included)
  - WebVTT and TTML
  - CEA-608/708 captions
@@ -152,7 +152,7 @@ NOTES:
    site with encrypted media, the user will be prompted to enable DRM.
  - ³: PlayReady in Edge does not seem to work on a VM or over Remote Desktop.
  - ⁴: IE 11 offers PlayReady support on Windows 8.1 and Windows 10 only.  (IE
-   support will stop in v2.7:
+   support will stop in v3.1:
    https://github.com/google/shaka-player/issues/2339)
  - ⁵: These are expected to work, but are not actively tested by the Shaka
    Player team.
@@ -174,7 +174,7 @@ Shaka Player supports:
       SegmentTemplate@index
     - Not supported in HLS
   - MPEG-2 TS
-    - With help from [mux.js][] v5.1.3+, can be played on any browser which
+    - With help from [mux.js][] v5.6.3+, can be played on any browser which
       supports MP4
     - Can find and parse timestamps to find segment start time in HLS
   - WebVTT
@@ -191,24 +191,30 @@ attributes.
 <!-- TODO: replace with a link to a TextDisplayer tutorial -->
 
 
-## Important Links ##
+## Documentation & Important Links ##
 
- * [development roadmap](roadmap.md)
- * [hosted demo](http://shaka-player-demo.appspot.com) (sources in `demo/`)
- * [hosted builds on Google Hosted Libraries](https://developers.google.com/speed/libraries/#shaka-player)
- * [hosted builds on jsDelivr](https://www.jsdelivr.com/package/npm/shaka-player)
- * [announcement list](https://groups.google.com/forum/#!forum/shaka-player-users)
+ * [Demo](https://shaka-player-demo.appspot.com)([sources](demo/))
+ * [API documentation](https://shaka-player-demo.appspot.com/docs/api/index.html)
+ * [Tutorials](https://shaka-player-demo.appspot.com/docs/api/tutorial-welcome.html)
+ * [Hosted builds on Google Hosted Libraries](https://developers.google.com/speed/libraries/#shaka-player)
+ * [Hosted builds on jsDelivr](https://www.jsdelivr.com/package/npm/shaka-player)
+ * [Development roadmap](roadmap.md)
+ * [Announcement list](https://groups.google.com/forum/#!forum/shaka-player-users)
      ([join](docs/announcement-list-join-group.png) for release and survey
       announcements)
- * [hosted API docs](http://shaka-player-demo.appspot.com/docs/api/index.html)
- * [tutorials](http://shaka-player-demo.appspot.com/docs/api/tutorial-welcome.html)
+
+
+## FAQ ##
+
+For general help and before filing any bugs, please read the
+[FAQ](docs/tutorials/faq.md).
 
 
 ## Contributing ##
 
 If you have improvements or fixes, we would love to have your contributions.
-Please read CONTRIBUTING.md for more information on the process we would like
-contributors to follow.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md)
+for more information on the process we would like contributors to follow.
 
 
 ## Framework Integrations ##
@@ -221,11 +227,8 @@ Shaka + ReactJS integrations:
 - https://github.com/matvp91/shaka-player-react
 - https://github.com/amit08255/shaka-player-react-with-ui-config
 
-If you have published Shaka Integration code/tutorials, please let us know, we'd
-love to add it top the list!
+Shaka + Next.js integration:
+- https://github.com/amit08255/shaka-player-react-with-ui-config/tree/master/nextjs-shaka-player
 
-
-## FAQ ##
-
-For general help and before filing any bugs, please read the
-[FAQ](docs/tutorials/faq.md).
+If you have published Shaka Integration code/tutorials, please feel free to submit PRs
+to add them to this list, we will gladly approve!

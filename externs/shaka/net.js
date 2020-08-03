@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -112,7 +113,7 @@ shaka.extern.Request;
  *   All keys should be lowercased.
  *   For HTTP/HTTPS, may not be available cross-origin.
  * @property {(number|undefined)} timeMs
- *   Optional.  The time it took to get the response, in miliseconds.  If not
+ *   Optional.  The time it took to get the response, in milliseconds.  If not
  *   given, NetworkingEngine will calculate it using Date.now.
  * @property {(boolean|undefined)} fromCache
  *   Optional. If true, this response was from a cache and should be ignored

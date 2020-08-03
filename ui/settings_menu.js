@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -39,12 +40,12 @@ shaka.ui.SettingsMenu = class extends shaka.ui.Element {
    * @private
    */
   addButton_(iconText) {
-    /** @protected {!HTMLElement}*/
-    this.button = shaka.util.Dom.createHTMLElement('button');
+    /** @protected {!HTMLButtonElement} */
+    this.button = shaka.util.Dom.createButton();
 
     /** @protected {!HTMLElement}*/
     this.icon = shaka.util.Dom.createHTMLElement('i');
-    this.icon.classList.add('material-icons');
+    this.icon.classList.add('material-icons-round');
     this.icon.textContent = iconText;
     this.button.appendChild(this.icon);
 
@@ -72,14 +73,15 @@ shaka.ui.SettingsMenu = class extends shaka.ui.Element {
     this.menu.classList.add('shaka-no-propagation');
     this.menu.classList.add('shaka-show-controls-on-mouse-over');
     this.menu.classList.add('shaka-settings-menu');
+    this.menu.classList.add('shaka-hidden');
 
-    /** @protected {!HTMLElement}*/
-    this.backButton = shaka.util.Dom.createHTMLElement('button');
+    /** @protected {!HTMLButtonElement}*/
+    this.backButton = shaka.util.Dom.createButton();
     this.backButton.classList.add('shaka-back-to-overflow-button');
     this.menu.appendChild(this.backButton);
 
     const backIcon = shaka.util.Dom.createHTMLElement('i');
-    backIcon.classList.add('material-icons');
+    backIcon.classList.add('material-icons-round');
     backIcon.textContent = shaka.ui.Enums.MaterialDesignIcons.BACK;
     this.backButton.appendChild(backIcon);
 

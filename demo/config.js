@@ -1,4 +1,5 @@
-/** @license
+/*! @license
+ * Shaka Player
  * Copyright 2016 Google LLC
  * SPDX-License-Identifier: Apache-2.0
  */
@@ -125,7 +126,14 @@ shakaDemo.Config = class {
     const docLink = this.resolveExternLink_('.DrmConfiguration');
     this.addSection_(MessageIds.DRM_SECTION_HEADER, docLink)
         .addBoolInput_(MessageIds.DELAY_LICENSE,
-            'drm.delayLicenseRequestUntilPlayed');
+            'drm.delayLicenseRequestUntilPlayed')
+        .addBoolInput_(MessageIds.LOG_LICENSE_EXCHANGE,
+            'drm.logLicenseExchange')
+        .addNumberInput_(MessageIds.UPDATE_EXPIRATION_TIME,
+            'drm.updateExpirationTime',
+            /* canBeDecimal= */ true,
+            /* canBeZero= */ false,
+            /* canBeUnset= */ true);
     const advanced = shakaDemoMain.getConfiguration().drm.advanced || {};
     const robustnessSuggestions = [
       'SW_SECURE_CRYPTO',
@@ -178,6 +186,8 @@ shakaDemo.Config = class {
             'manifest.dash.ignoreEmptyAdaptationSet')
         .addBoolInput_(MessageIds.IGNORE_HLS_TEXT_FAILURES,
             'manifest.hls.ignoreTextStreamFailures')
+        .addBoolInput_(MessageIds.USE_FULL_SEGMENTS_FOR_START_TIME,
+            'manifest.hls.useFullSegmentsForStartTime')
         .addNumberInput_(MessageIds.AVAILABILITY_WINDOW_OVERRIDE,
             'manifest.availabilityWindowOverride',
             /* canBeDecimal= */ true,
@@ -186,7 +196,7 @@ shakaDemo.Config = class {
         .addTextInput_(MessageIds.CLOCK_SYNC_URI, 'manifest.dash.clockSyncUri')
         .addBoolInput_(MessageIds.IGNORE_DRM, 'manifest.dash.ignoreDrmInfo')
         .addNumberInput_(MessageIds.DEFAULT_PRESENTATION_DELAY,
-            'manifest.dash.defaultPresentationDelay')
+            'manifest.defaultPresentationDelay')
         .addBoolInput_(MessageIds.IGNORE_MIN_BUFFER_TIME,
             'manifest.dash.ignoreMinBufferTime')
         .addNumberInput_(MessageIds.INITIAL_SEGMENT_LIMIT,
@@ -199,7 +209,9 @@ shakaDemo.Config = class {
         .addBoolInput_(MessageIds.DISABLE_VIDEO,
             'manifest.disableVideo')
         .addBoolInput_(MessageIds.DISABLE_TEXT,
-            'manifest.disableText');
+            'manifest.disableText')
+        .addBoolInput_(MessageIds.LOW_LATENCY,
+            'manifest.lowLatencyMode');
 
     this.addRetrySection_('manifest', MessageIds.MANIFEST_RETRY_SECTION_HEADER);
   }
@@ -210,6 +222,8 @@ shakaDemo.Config = class {
     const docLink = this.resolveExternLink_('.AbrConfiguration');
     this.addSection_(MessageIds.ADAPTATION_SECTION_HEADER, docLink)
         .addBoolInput_(MessageIds.ENABLED, 'abr.enabled')
+        .addBoolInput_(MessageIds.NETWORK_INFORMATION,
+            'abr.useNetworkInformation')
         .addNumberInput_(MessageIds.BANDWIDTH_ESTIMATE,
             'abr.defaultBandwidthEstimate')
         .addNumberInput_(MessageIds.BANDWIDTH_DOWNGRADE,
@@ -305,6 +319,9 @@ shakaDemo.Config = class {
             /* canBeDecimal= */ true)
         .addNumberInput_(MessageIds.SAFE_SKIP_DISTANCE,
             'streaming.stallSkip',
+            /* canBeDecimal= */ true)
+        .addNumberInput_(MessageIds.INACCURATE_MANIFEST_TOLERANCE,
+            'streaming.inaccurateManifestTolerance',
             /* canBeDecimal= */ true);
 
     if (!shakaDemoMain.getNativeControlsEnabled()) {
@@ -314,7 +331,7 @@ shakaDemo.Config = class {
       // Add a fake custom fixed "input" that warns the users not to change it.
       const noop = (input) => {};
       this.addCustomBoolInput_(MessageIds.ALWAYS_STREAM_TEXT,
-          noop, MessageIds.ALWAYS_STREAM_TEXT);
+          noop, MessageIds.ALWAYS_STREAM_TEXT_WARNING);
       this.latestInput_.input().disabled = true;
       this.latestInput_.input().checked = true;
     }
@@ -372,6 +389,22 @@ shakaDemo.Config = class {
     // are ready to add ALL of the tooltip messages.
     if (!shakaDemoMain.getNativeControlsEnabled()) {
       this.latestInput_.input().checked = true;
+    }
+
+    if (!shakaDemoMain.getNativeControlsEnabled()) {
+      this.addCustomBoolInput_(MessageIds.TRICK_PLAY_CONTROLS, (input) => {
+        shakaDemoMain.setTrickPlayControlsEnabled(input.checked);
+      });
+      if (shakaDemoMain.getTrickPlayControlsEnabled()) {
+        this.latestInput_.input().checked = true;
+      }
+    } else {
+      // Add a fake custom fixed "input" that warns the users not to change it.
+      const noop = (input) => {};
+      this.addCustomBoolInput_(MessageIds.TRICK_PLAY_CONTROLS,
+          noop, MessageIds.TRICK_PLAY_CONTROLS_WARNING);
+      this.latestInput_.input().disabled = true;
+      this.latestInput_.input().checked = false;
     }
 
     // shaka.log is not set if logging isn't enabled.
@@ -477,7 +510,7 @@ shakaDemo.Config = class {
 
   /**
    * @param {!shakaDemo.MessageIds} name
-   * @param {function(!Element)} onChange
+   * @param {function(!HTMLInputElement)} onChange
    * @param {shakaDemo.MessageIds=} tooltipMessage
    * @return {!shakaDemo.Config}
    * @private
@@ -510,7 +543,7 @@ shakaDemo.Config = class {
 
   /**
    * @param {!shakaDemo.MessageIds} name
-   * @param {function(!Element)} onChange
+   * @param {function(!HTMLInputElement)} onChange
    * @param {shakaDemo.MessageIds=} tooltipMessage
    * @return {!shakaDemo.Config}
    * @private
@@ -574,7 +607,7 @@ shakaDemo.Config = class {
   /**
    * @param {!shakaDemo.MessageIds} name
    * @param {!Array.<string>} values
-   * @param {function(!Element)} onChange
+   * @param {function(!HTMLInputElement)} onChange
    * @param {shakaDemo.MessageIds=} tooltipMessage
    * @return {!shakaDemo.Config}
    * @private
@@ -590,7 +623,7 @@ shakaDemo.Config = class {
   /**
    * @param {!shakaDemo.MessageIds} name
    * @param {!Object.<string, string>} values
-   * @param {function(!Element)} onChange
+   * @param {function(!HTMLInputElement)} onChange
    * @param {shakaDemo.MessageIds=} tooltipMessage
    * @return {!shakaDemo.Config}
    * @private
