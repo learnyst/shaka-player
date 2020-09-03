@@ -29,9 +29,11 @@ describe('DashParser SegmentBase', () => {
     playerInterface = {
       networkingEngine: fakeNetEngine,
       filter: (manifest) => Promise.resolve(),
+      makeTextStreamsForClosedCaptions: (manifest) => {},
       onTimelineRegionAdded: fail,  // Should not have any EventStream elements.
       onEvent: fail,
       onError: fail,
+      isLowLatencyMode: () => false,
     };
   });
 
@@ -41,13 +43,13 @@ describe('DashParser SegmentBase', () => {
       '  <BaseURL>http://example.com</BaseURL>',
       '  <Period>',
       '    <AdaptationSet mimeType="video/webm">',
-      '      <Representation id="1" bandwidth="1">',
+      '      <Representation id="1" bandwidth="1" frameRate="3000/3001">',
       '        <BaseURL>media-1.webm</BaseURL>',
       '        <SegmentBase indexRange="100-200" timescale="9000">',
       '          <Initialization sourceURL="init-1.webm" range="201-300" />',
       '        </SegmentBase>',
       '      </Representation>',
-      '      <Representation id="2" bandwidth="1">',
+      '      <Representation id="2" bandwidth="1" frameRate="1500/1501">',
       '        <BaseURL>media-2.webm</BaseURL>',
       '        <SegmentBase indexRange="1100-1200" timescale="9000">',
       '          <Initialization sourceURL="init-2.webm" range="1201-1300" />',

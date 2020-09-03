@@ -69,6 +69,17 @@ describe('SimpleTextDisplayer', () => {
 
     it('appends equal time cues in reverse order', () => {
       // Regression test for https://github.com/google/shaka-player/issues/848
+
+      // When VTTCue is seen as the real thing (because of the presence of
+      // VTTCue.prototype.line), then the reverse-order behavior comes into
+      // play.  The reverse order is only needed because of VTTCue spec
+      // behavior.
+
+      // First we test the behavior with a real-looking VTTCue (in which
+      // prototype.line merely exists).  This simulates Chrome, Firefox, and
+      // Safari.
+      // eslint-disable-next-line no-restricted-syntax
+      window.VTTCue.prototype['line'] = 'auto';
       verifyHelper(
           [
             {startTime: 20, endTime: 40, text: 'Test1'},
@@ -76,21 +87,115 @@ describe('SimpleTextDisplayer', () => {
             {startTime: 20, endTime: 40, text: 'Test3'},
           ],
           [
+            // Reverse order to compensate for the way line='auto' is
+            // implemented in browsers.
             new shaka.text.Cue(20, 40, 'Test3'),
             new shaka.text.Cue(20, 40, 'Test2'),
             new shaka.text.Cue(20, 40, 'Test1'),
+          ]);
+
+      // Next we test the behavior with a VTTCue which is seen as a cheap
+      // polyfill (in which prototype.line does not exist).  This simulates IE
+      // and legacy Edge.
+      // eslint-disable-next-line no-restricted-syntax
+      delete window.VTTCue.prototype['line'];
+      displayer.remove(0, Infinity);  // Clear the cues from above.
+      verifyHelper(
+          [
+            {startTime: 20, endTime: 40, text: 'Test1'},
+            {startTime: 20, endTime: 40, text: 'Test2'},
+            {startTime: 20, endTime: 40, text: 'Test3'},
+          ],
+          [
+            // Input order, since the displayer sees this as a fake VTTCue
+            // implementation.
+            new shaka.text.Cue(20, 40, 'Test1'),
+            new shaka.text.Cue(20, 40, 'Test2'),
+            new shaka.text.Cue(20, 40, 'Test3'),
           ]);
     });
 
     it('appends nested cues', () => {
       const shakaCue = new shaka.text.Cue(10, 20, '');
-      const nestedCue1 = new shaka.text.Cue(10, 20, 'Test1');
+      const nestedCue1 = new shaka.text.Cue(10, 20, 'Test1 ');
       const nestedCue2 = new shaka.text.Cue(10, 20, 'Test2');
 
       shakaCue.nestedCues = [nestedCue1, nestedCue2];
       verifyHelper(
           [
             {startTime: 10, endTime: 20, text: 'Test1 Test2'},
+          ],
+          [shakaCue]);
+    });
+
+    // Regression test for b/159050711
+    it('maintains the styles of the parent cue', () => {
+      const shakaCue = new shaka.text.Cue(10, 20, '');
+      const nestedCue1 = new shaka.text.Cue(10, 20, 'Test1 ');
+      const nestedCue2 = new shaka.text.Cue(10, 20, 'Test2');
+
+      shakaCue.nestedCues = [nestedCue1, nestedCue2];
+
+      shakaCue.lineAlign = Cue.lineAlign.CENTER;
+      nestedCue1.lineAlign = Cue.lineAlign.START;
+      nestedCue2.lineAlign = Cue.lineAlign.START;
+
+      verifyHelper(
+          [
+            {
+              startTime: 10,
+              endTime: 20,
+              text: 'Test1 Test2',
+              lineAlign: 'center',
+            },
+          ],
+          [shakaCue]);
+    });
+
+    it('creates style tags for cues with underline/italics/bold', () => {
+      const shakaCue = new shaka.text.Cue(10, 20, '');
+
+      // First cue is underlined and italicized.
+      const nestedCue1 = new shaka.text.Cue(10, 20, 'Test1');
+      nestedCue1.fontStyle = shaka.text.Cue.fontStyle.ITALIC;
+      nestedCue1.textDecoration.push(shaka.text.Cue.textDecoration.UNDERLINE);
+
+      // Second cue is italicized and bolded.
+      const nestedCue2 = new shaka.text.Cue(10, 20, 'Test2');
+      nestedCue2.fontStyle = shaka.text.Cue.fontStyle.ITALIC;
+      nestedCue2.fontWeight = shaka.text.Cue.fontWeight.BOLD;
+
+      // Third cue has no bold, italics, or underline.
+      const nestedCue3 = new shaka.text.Cue(10, 20, 'Test3');
+
+      // Fourth cue is only underlined.
+      const nestedCue4 = new shaka.text.Cue(10, 20, 'Test4');
+      nestedCue4.textDecoration.push(shaka.text.Cue.textDecoration.UNDERLINE);
+
+      const expectedText =
+          '<i><u>Test1</u></i><b><i>Test2</i></b>Test3<u>Test4</u>';
+      shakaCue.nestedCues = [nestedCue1, nestedCue2, nestedCue3, nestedCue4];
+      verifyHelper(
+          [
+            {startTime: 10, endTime: 20, text: expectedText},
+          ],
+          [shakaCue]);
+    });
+
+    it('adds linebreaks when a linebreak cue is seen', () => {
+      const shakaCue = new shaka.text.Cue(10, 20, '');
+      const nestedCue1 = new shaka.text.Cue(10, 20, 'Test1');
+
+      // Second cue is a linebreak cue.
+      const nestedCue2 = new shaka.text.Cue(10, 20, '');
+      nestedCue2.spacer = true;
+
+      const nestedCue3 = new shaka.text.Cue(10, 20, 'Test2');
+
+      shakaCue.nestedCues = [nestedCue1, nestedCue2, nestedCue3];
+      verifyHelper(
+          [
+            {startTime: 10, endTime: 20, text: 'Test1\nTest2'},
           ],
           [shakaCue]);
     });

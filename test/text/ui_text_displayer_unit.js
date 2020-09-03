@@ -83,7 +83,7 @@ describe('UITextDisplayer', () => {
 
     const textContainer =
         videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
     expect(cssObj).toEqual(
         jasmine.objectContaining({
@@ -105,7 +105,7 @@ describe('UITextDisplayer', () => {
 
   it('correctly displays styles for nested cues', async () => {
     /** @type {!shaka.text.Cue} */
-    const cue = new shaka.text.Cue(0, 100, 'Captain\'s log.');
+    const cue = new shaka.text.Cue(0, 100, '');
     const nestedCue = new shaka.text.Cue(0, 100, 'Captain\'s log.');
     cue.nestedCues = [nestedCue];
     nestedCue.textAlign = 'center';
@@ -170,7 +170,7 @@ describe('UITextDisplayer', () => {
 
     const textContainer =
         videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
     expect(cssObj).toEqual(
         jasmine.objectContaining({
@@ -200,30 +200,97 @@ describe('UITextDisplayer', () => {
 
     const textContainer =
         videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
     expect(cssObj).toEqual(
         jasmine.objectContaining({'font-size': expectedFontSize}));
   });
 
   it('does not display duplicate cues', async () => {
-    const cue = new shaka.text.Cue(0, 100, 'Captain\'s log.');
+    // These are identical.
+    const cue1 = new shaka.text.Cue(0, 100, 'Captain\'s log.');
+    const cue2 = new shaka.text.Cue(0, 100, 'Captain\'s log.');
+
     textDisplayer.setTextVisibility(true);
-    textDisplayer.append([cue]);
+    textDisplayer.append([cue1]);
     // Wait until updateCaptions_() gets called.
     await shaka.test.Util.delay(0.5);
     /** @type {Element} */
     const textContainer = videoContainer.querySelector('.shaka-text-container');
-    let captions = textContainer.querySelectorAll('span');
+    let captions = textContainer.querySelectorAll('div');
     // Expect textContainer to display this cue.
     expect(captions.length).toBe(1);
 
-    const cue2 = new shaka.text.Cue(0, 100, 'Captain\'s log.');
     textDisplayer.append([cue2]);
     // Wait until updateCaptions_() gets called.
     await shaka.test.Util.delay(0.5);
-    captions = textContainer.querySelectorAll('span');
+    captions = textContainer.querySelectorAll('div');
     // Expect textContainer to display one cue without duplication.
     expect(captions.length).toBe(1);
+  });
+
+  it('does not mistake cues with nested cues as duplicates', async () => {
+    // These are not identical, but might look like it at the top level.
+    const cue1 = new shaka.text.Cue(0, 100, '');
+    cue1.nestedCues = [
+      new shaka.text.Cue(0, 100, 'Nested cue 1.'),
+    ];
+    const cue2 = new shaka.text.Cue(0, 100, '');
+    cue2.nestedCues = [
+      new shaka.text.Cue(0, 100, 'Nested cue 2.'),
+    ];
+    const cue3 = new shaka.text.Cue(0, 100, '');
+    cue3.nestedCues = [
+      new shaka.text.Cue(0, 100, 'Nested cue 3.'),
+    ];
+
+    textDisplayer.setTextVisibility(true);
+    textDisplayer.append([cue1]);
+    // Wait until updateCaptions_() gets called.
+    await shaka.test.Util.delay(0.5);
+    /** @type {Element} */
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    let captions = textContainer.querySelectorAll('div');
+    // Expect textContainer to display this cue.
+    expect(captions.length).toBe(1);
+
+    textDisplayer.append([cue2, cue3]);
+    // Wait until updateCaptions_() gets called.
+    await shaka.test.Util.delay(0.5);
+    captions = textContainer.querySelectorAll('div');
+    // Expect textContainer to display all three cues, since they are not truly
+    // duplicates.
+    expect(captions.length).toBe(3);
+  });
+
+  it('does not mistake cues with different styles duplicates', async () => {
+    // These all have the same text and timing, but different styles.
+    const cue1 = new shaka.text.Cue(0, 100, 'Hello!');
+    cue1.color = 'green';
+
+    const cue2 = new shaka.text.Cue(0, 100, 'Hello!');
+    cue2.color = 'green';
+    cue2.fontStyle = shaka.text.Cue.fontStyle.ITALIC;
+
+    const cue3 = new shaka.text.Cue(0, 100, 'Hello!');
+    cue3.color = 'blue';
+
+    textDisplayer.setTextVisibility(true);
+    textDisplayer.append([cue1]);
+    // Wait until updateCaptions_() gets called.
+    await shaka.test.Util.delay(0.5);
+    /** @type {Element} */
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    let captions = textContainer.querySelectorAll('div');
+    // Expect textContainer to display this cue.
+    expect(captions.length).toBe(1);
+
+    textDisplayer.append([cue2, cue3]);
+    // Wait until updateCaptions_() gets called.
+    await shaka.test.Util.delay(0.5);
+    captions = textContainer.querySelectorAll('div');
+    // Expect textContainer to display all three cues, since they are not truly
+    // duplicates.
+    expect(captions.length).toBe(3);
   });
 });

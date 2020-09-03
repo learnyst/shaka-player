@@ -50,6 +50,12 @@ const screenshots = [
   'bitmap-cue',
   'nested-cue-bg',
   'flat-cue-bg',
+  'deeply-nested-cues',
+];
+
+const prefixes = [
+  'native',
+  'ui',
 ];
 
     </script>
@@ -130,14 +136,16 @@ if (!name) {
   // Present a simple menu of screenshots to review.
   h1.textContent = 'Select a screenshot to review:';
 
-  for (const screenshot of screenshots) {
-    const li = document.createElement('li');
-    document.body.appendChild(li);
+  for (const prefix of prefixes) {
+    for (const screenshot of screenshots) {
+      const li = document.createElement('li');
+      document.body.appendChild(li);
 
-    const a = document.createElement('a');
-    a.textContent = screenshot;
-    a.href = '?' + screenshot;
-    li.appendChild(a);
+      const a = document.createElement('a');
+      a.textContent = prefix + '-' + screenshot;
+      a.href = '?' + prefix + '-' + screenshot;
+      li.appendChild(a);
+    }
   }
 } else {
   h1.textContent = 'Screenshots: ' + name;

@@ -82,10 +82,12 @@ describe('HlsParser', () => {
     onEventSpy = jasmine.createSpy('onEvent');
     playerInterface = {
       filter: () => Promise.resolve(),
+      makeTextStreamsForClosedCaptions: (manifest) => {},
       networkingEngine: fakeNetEngine,
       onError: fail,
       onEvent: shaka.test.Util.spyFunc(onEventSpy),
       onTimelineRegionAdded: fail,
+      isLowLatencyMode: () => false,
     };
 
     parser = new shaka.hls.HlsParser();
@@ -1721,11 +1723,14 @@ describe('HlsParser', () => {
     const initDataBase64 =
         'dGhpcyBpbml0IGRhdGEgY29udGFpbnMgaGlkZGVuIHNlY3JldHMhISE=';
 
+    const keyId = 'abc123';
+
     const media = [
       '#EXTM3U\n',
       '#EXT-X-TARGETDURATION:6\n',
       '#EXT-X-PLAYLIST-TYPE:VOD\n',
       '#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,',
+      'KEYID=0X' + keyId + ',',
       'KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",',
       'URI="data:text/plain;base64,',
       initDataBase64, '",\n',
@@ -1741,6 +1746,46 @@ describe('HlsParser', () => {
         variant.addPartialStream(ContentType.VIDEO, (stream) => {
           stream.encrypted = true;
           stream.addDrmInfo('com.widevine.alpha', (drmInfo) => {
+            drmInfo.addCencInitData(initDataBase64);
+            drmInfo.keyIds.add(keyId);
+          });
+        });
+      });
+    });
+
+    await testHlsParser(master, media, manifest);
+  });
+
+  it('constructs DrmInfo for PlayReady', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1",',
+      'RESOLUTION=960x540,FRAME-RATE=60\n',
+      'video\n',
+    ].join('');
+
+    const initDataBase64 =
+        'AAAAKXBzc2gAAAAAmgTweZhAQoarkuZb4IhflQAAAAlQbGF5cmVhZHk=';
+
+    const media = [
+      '#EXTM3U\n',
+      '#EXT-X-TARGETDURATION:6\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,',
+      'KEYFORMAT="com.microsoft.playready",',
+      'URI="data:text/plain;base64,UGxheXJlYWR5",\n',
+      '#EXT-X-MAP:URI="init.mp4"\n',
+      '#EXTINF:5,\n',
+      '#EXT-X-BYTERANGE:121090@616\n',
+      'main.mp4',
+    ].join('');
+
+    const manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+      manifest.anyTimeline();
+      manifest.addPartialVariant((variant) => {
+        variant.addPartialStream(ContentType.VIDEO, (stream) => {
+          stream.encrypted = true;
+          stream.addDrmInfo('com.microsoft.playready', (drmInfo) => {
             drmInfo.addCencInitData(initDataBase64);
           });
         });

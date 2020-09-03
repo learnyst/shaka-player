@@ -260,6 +260,7 @@ describe('DrmEngine', () => {
       expect(drmEngine.initialized()).toBe(true);
       expect(drmEngine.willSupport('audio/webm')).toBeTruthy();
       expect(drmEngine.willSupport('video/mp4; codecs="fake"')).toBeTruthy();
+      expect(drmEngine.willSupport('video/mp4; codecs="FAKE"')).toBeTruthy();
 
       // Because DrmEngine will err on being too accepting, make sure it will
       // reject something. However, we can only check that it is actually
@@ -726,6 +727,25 @@ describe('DrmEngine', () => {
       expect(mockMediaKeys.createSession).toHaveBeenCalledTimes(1);
       expect(session1.generateRequest)
           .toHaveBeenCalledWith('cenc', initData1);
+    });
+
+    // https://github.com/google/shaka-player/issues/2754
+    it('ignores duplicate init data from newInitData', async () => {
+      /** @type {!Uint8Array} */
+      const initData = new Uint8Array(1);
+
+      tweakDrmInfos((drmInfos) => {
+        drmInfos[0].initData =
+            [{initData: initData, initDataType: 'cenc', keyId: 'abc'}];
+      });
+
+      await drmEngine.initForPlayback(
+          manifest.variants, manifest.offlineSessionIds);
+      drmEngine.newInitData('cenc', initData);
+      await drmEngine.attach(mockVideo);
+
+      expect(mockMediaKeys.createSession).toHaveBeenCalledTimes(1);
+      expect(session1.generateRequest).toHaveBeenCalledWith('cenc', initData);
     });
 
     it('uses clearKeys config to override DrmInfo', async () => {
