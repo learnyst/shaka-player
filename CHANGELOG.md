@@ -1,4 +1,4 @@
-## 3.0.401 (2020-08-25)
+## 3.0.402 (2020-08-25)
 
 Bugfixes:
   - Fix case sensitivity in KEYID format check in HLS
