@@ -333,7 +333,7 @@ class CssLinter(object):
     # This is currently a flag added in a fork we maintain, but there is a pull
     # request in progress for this.
     # See: https://github.com/stylelint/stylelint/issues/4193
-    cmd_line += ['--disable-globbing'];
+    # cmd_line += ['--disable-globbing'];
 
     if fix:
       cmd_line += ['--fix']
