@@ -31,8 +31,8 @@ shakaDemo.Custom = class {
    * Register the page configuration.
    */
   static init() {
-    const container = shakaDemoMain.addNavButton('custom');
-    shakaDemoCustom = new shakaDemo.Custom(container);
+    const elements = shakaDemoMain.addNavButton('custom');
+    shakaDemoCustom = new shakaDemo.Custom(elements.container);
   }
 
   /** @param {!Element} container */
@@ -339,7 +339,7 @@ shakaDemo.Custom = class {
       button.classList.add('mdl-button--fab');
       button.classList.add('mdl-button--colored');
       const icon = document.createElement('i');
-      icon.classList.add('material-icons');
+      icon.classList.add('material-icons-round');
       icon.textContent = name;
       button.appendChild(icon);
     } else {
@@ -372,6 +372,8 @@ shakaDemo.Custom = class {
         }
         this.showAssetDialog_(asset);
       });
+      // TODO: Localize these messages.
+      const deleteDialog = 'Delete this custom asset?';
       c.addButton('Delete', async () => {
         this.assets_.delete(asset);
         if (asset.unstoreCallback) {
@@ -379,7 +381,7 @@ shakaDemo.Custom = class {
         }
         this.saveAssetInfos_(this.assets_);
         this.remakeSavedList_();
-      });
+      }, deleteDialog);
       c.addStoreButton();
     });
   }
@@ -433,3 +435,6 @@ shakaDemo.Custom.saveId_ = 'shakaPlayerDemoSavedAssets';
 
 
 document.addEventListener('shaka-main-loaded', shakaDemo.Custom.init);
+document.addEventListener('shaka-main-cleanup', () => {
+  shakaDemoCustom = null;
+});

@@ -25,6 +25,12 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
+  it('supports empty text string', () => {
+    verifyHelper([],
+        '',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
   it('supports div with no cues but whitespace', function() {
     verifyHelper(
         [],
@@ -47,7 +53,11 @@ describe('TtmlTextParser', function() {
             start: 62.03,
             end: 62.05,
             payload: '',
-            nestedCues: [{payload: 'A B C'}],
+            nestedCues: [{
+              payload: 'A B C',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
           },
         ],
         '<tt xml:space="default">' + ttBody + '</tt>',
@@ -59,7 +69,11 @@ describe('TtmlTextParser', function() {
             start: 62.03,
             end: 62.05,
             payload: '',
-            nestedCues: [{payload: ' A    B   C  '}],
+            nestedCues: [{
+              payload: ' A    B   C  ',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
           },
         ],
         '<tt xml:space="preserve">' + ttBody + '</tt>',
@@ -71,19 +85,24 @@ describe('TtmlTextParser', function() {
             start: 62.03,
             end: 62.05,
             payload: '',
-            nestedCues: [{payload: 'A B C'}],
+            nestedCues: [{
+              payload: 'A B C',
+              startTime: 62.03,
+              endTime: 62.05,
+            }],
           },
         ],
         '<tt>' + ttBody + '</tt>',
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
     // Any other value is rejected as an error.
     errorHelper(shaka.util.Error.Code.INVALID_XML,
-                '<tt xml:space="invalid">' + ttBody + '</tt>');
+        '<tt xml:space="invalid">' + ttBody + '</tt>',
+        jasmine.any(String));
   });
 
-  it('rejects invalid ttml', function() {
-    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>');
-    errorHelper(shaka.util.Error.Code.INVALID_XML, '');
+  it('rejects invalid ttml', () => {
+    const anyString = jasmine.any(String);
+    errorHelper(shaka.util.Error.Code.INVALID_XML, '<test></test>', anyString);
   });
 
   it('rejects invalid time format', function() {
@@ -101,9 +120,22 @@ describe('TtmlTextParser', function() {
             end: 3723.2,
             payload: '',
             nestedCues: [
-              {payload: 'First cue'},
-              {payload: '', spacer: true},
-              {payload: 'Second cue'},
+              {
+                payload: 'First cue',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+              {
+                payload: '',
+                spacer: true,
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+              {
+                payload: 'Second cue',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
             ],
           },
         ],
@@ -132,7 +164,29 @@ describe('TtmlTextParser', function() {
         {periodStart: 7, segmentStart: 0, segmentEnd: 0});
   });
 
-  it('supports time in 0.00h 0.00m 0.00s format', function() {
+  it('supports nested cues with an offset', () => {
+    verifyHelper(
+        [
+          {
+            start: 69.05,
+            end: 3730.2,
+            payload: '',
+            nestedCues: [
+              {
+                payload: 'Nested cue',
+                startTime: 69.05,
+                endTime: 3730.2,
+              },
+            ],
+          },
+        ],
+        '<tt><body><div>' +
+        '<p begin="01:02.05" end="01:02:03.200"><span>Nested cue</span></p>' +
+        '</div></body></tt>',
+        {periodStart: 7, segmentStart: 0, segmentEnd: 0});
+  });
+
+  it('supports time in 0.00h 0.00m 0.00s format', () => {
     verifyHelper(
         [
           {start: 3567.03, end: 5402.3, payload: 'Test'},
@@ -531,6 +585,34 @@ describe('TtmlTextParser', function() {
         {periodStart: 0, segmentStart: 0, segmentEnd: 0});
   });
 
+  it('supports percentages containing decimals', () => {
+    verifyHelper(
+        [
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: 'Test',
+            region: {
+              id: 'subtitleArea',
+              viewportAnchorX: 12.2,
+              viewportAnchorY: 50.005,
+              width: 100,
+              height: 100,
+            },
+          },
+        ],
+        '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
+        '<layout>' +
+        '<region xml:id="subtitleArea" tts:origin="12.2% 50.005%" ' +
+        'tts:writingMode="tb" />' +
+        '</layout>' +
+        '<body region="subtitleArea">' +
+        '<p begin="01:02.05" end="01:02:03.200">Test</p>' +
+        '</body>' +
+        '</tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
   it('supports writingMode setting', function() {
     verifyHelper(
         [
@@ -726,7 +808,11 @@ describe('TtmlTextParser', function() {
             start: 62.05,
             end: 3723.2,
             payload: '',
-            nestedCues: [{payload: 'Line1\nLine2'}],
+            nestedCues: [{
+              payload: 'Line1\nLine2',
+              startTime: 62.05,
+              endTime: 3723.2,
+            }],
           },
         ],
         '<tt><body><p begin="01:02.05" ' +
@@ -873,6 +959,87 @@ describe('TtmlTextParser', function() {
   });
 
 
+  // Regression test for https://github.com/google/shaka-player/issues/2478
+  it('supports nested cues with only non-ASCII characters', () => {
+    verifyHelper(
+        [
+          {
+            start: 62.05,
+            end: 3723.2,
+            payload: '',
+            nestedCues: [
+              {
+                payload: 'äöü',
+                startTime: 62.05,
+                endTime: 3723.2,
+              },
+            ],
+          },
+        ],
+        '<tt><body><p begin="01:02.05" end="01:02:03.200">' +
+        '<span>äöü</span></p></body></tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
+  // Regression test for b/159050711
+  it('inherits styles from other styles on both element and region', () => {
+    verifyHelper(
+        [
+          {
+            start: 0,
+            end: 60,
+            payload: '',
+
+            // Styles from regionStyle
+            backgroundColor: 'transparent',
+            color: 'blue',
+            // Styles inherited from backgroundStyle via regionStyle
+            displayAlign: Cue.displayAlign.CENTER,
+            textAlign: Cue.textAlign.CENTER,
+
+            nestedCues: [
+              {
+                startTime: 0,
+                endTime: 60,
+                payload: 'Test',
+
+                // Style from spanStyle, overrides regionStyle
+                backgroundColor: 'white',
+                // Style inherited from regionStyle via spanStyle
+                color: 'blue',
+                // Styles inherited from backgroundStyle via regionStyle via
+                // spanStyle
+                displayAlign: Cue.displayAlign.CENTER,
+                textAlign: Cue.textAlign.CENTER,
+              },
+            ],
+          },
+        ],
+        '<tt xmlns:tts="http://www.w3.org/ns/ttml#styling">' +
+        '<head>' +
+        '  <layout>' +
+        '    <region xml:id="r1" style="regionStyle" />' +
+        '  </layout>' +
+        '  <styling>' +
+        // spanStyle inherits attributes from regionStyle
+        '    <style xml:id="spanStyle" style="regionStyle" ' +
+        '           tts:backgroundColor="white" />' +
+        // regionStyle inherits attributes from backgroundStyle
+        '    <style xml:id="regionStyle" style="backgroundStyle" ' +
+        '           tts:backgroundColor="transparent" tts:color="blue" />' +
+        '    <style xml:id="backgroundStyle" ' +
+        '           tts:displayAlign="center" tts:textAlign="center" ' +
+        '           tts:fontSize="18px" />' +
+        '  </styling>' +
+        '</head>' +
+        '<body><div>' +
+        '  <p begin="00:00" end="01:00" region="r1">' +
+        '    <span style="spanStyle">Test</span>' +
+        '  </p>' +
+        '</div></body></tt>',
+        {periodStart: 0, segmentStart: 0, segmentEnd: 0});
+  });
+
   /**
    * @param {!Array} cues
    * @param {string} text
@@ -940,19 +1107,27 @@ describe('TtmlTextParser', function() {
   /**
    * @param {shaka.util.Error.Code} code
    * @param {string} text
+   * @param {*=} errorData
    */
-  function errorHelper(code, text) {
-    let error = new shaka.util.Error(
-        shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
-        code);
-    let data = shaka.util.StringUtils.toUTF8(text);
+  function errorHelper(code, text, errorData = undefined) {
+    let shakaError;
+    if (errorData) {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code, errorData);
+    } else {
+      shakaError = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL, shaka.util.Error.Category.TEXT,
+          code);
+    }
+    const data = shaka.util.StringUtils.toUTF8(text);
     try {
       new shaka.text.TtmlTextParser().parseMedia(
           new Uint8Array(data),
           {periodStart: 0, segmentStart: 0, segmentEnd: 0});
       fail('Invalid TTML file supported');
     } catch (e) {
-      shaka.test.Util.expectToEqualError(e, error);
+      shaka.test.Util.expectToEqualError(e, shakaError);
     }
   }
 });

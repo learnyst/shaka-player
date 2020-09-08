@@ -52,7 +52,7 @@ describe('MediaSourceEngine', function() {
   const originalTextEngine = shaka.text.TextEngine;
   const originalCreateMediaSource =
       shaka.media.MediaSourceEngine.prototype.createMediaSource;
-  const originalTransmuxerIsSupported = shaka.media.Transmuxer.isSupported;
+  const originalTransmuxer = shaka.media.Transmuxer;
 
   // Jasmine Spies don't handle toHaveBeenCalledWith well with objects, so use
   // some numbers instead.
@@ -77,6 +77,8 @@ describe('MediaSourceEngine', function() {
   let mockTextDisplayer;
   /** @type {!shaka.test.FakeClosedCaptionParser} */
   let mockClosedCaptionParser;
+  /** @type {!shaka.test.FakeTransmuxer} */
+  let mockTransmuxer;
 
   /** @type {!jasmine.Spy} */
   let createMediaSourceSpy;
@@ -92,15 +94,11 @@ describe('MediaSourceEngine', function() {
       let type = mimeType.split('/')[0];
       return type == 'video' || type == 'audio';
     };
-
-    shaka.media.Transmuxer.isSupported = function(mimeType, contentType) {
-      return mimeType == 'tsMimetype';
-    };
   });
 
   afterAll(function() {
     window.MediaSource.isTypeSupported = originalIsTypeSupported;
-    shaka.media.Transmuxer.isSupported = originalTransmuxerIsSupported;
+    shaka.media.Transmuxer = originalTransmuxer;
   });
 
   beforeEach(/** @suppress {invalidCasts} */ function() {
@@ -111,6 +109,14 @@ describe('MediaSourceEngine', function() {
       let type = mimeType.split('/')[0];
       return type == 'audio' ? audioSourceBuffer : videoSourceBuffer;
     });
+    mockTransmuxer = new shaka.test.FakeTransmuxer();
+
+    let func = function() { return mockTransmuxer; };
+    shaka.media.Transmuxer = /** @type {?} */ (func);
+    shaka.media.Transmuxer.convertTsCodecs = originalTransmuxer.convertTsCodecs;
+    shaka.media.Transmuxer.isSupported = (mimeType, contentType) => {
+      return mimeType == 'tsMimetype';
+    };
 
     shaka.text.TextEngine = createMockTextEngineCtor();
 
@@ -181,7 +187,13 @@ describe('MediaSourceEngine', function() {
       shaka.media.MediaSourceEngine.createObjectURL =
         Util.spyFunc(createObjectURLSpy);
 
-      let mediaSourceSpy = jasmine.createSpy('MediaSource').and.callFake(() => {
+      const mediaSourceSpy = jasmine.createSpy('MediaSource');
+      // Because this is a fake constructor, it must be callable with "new".
+      // This will cause jasmine to invoke the callback with "new" as well, so
+      // the callback must be a "function".  This detail is hidden when babel
+      // transpiles the tests.
+      // eslint-disable-next-line prefer-arrow-callback, no-restricted-syntax
+      mediaSourceSpy.and.callFake(function() {
         return mockMediaSource;
       });
       window.MediaSource = Util.spyFunc(mediaSourceSpy);
@@ -502,6 +514,12 @@ describe('MediaSourceEngine', function() {
       const initObject = new Map();
       initObject.set(ContentType.VIDEO, fakeTransportStream);
 
+      const output = {
+        data: new Uint8Array(1),
+        captions: [{}],
+      };
+      mockTransmuxer.transmux.and.returnValue(Promise.resolve(output));
+
       mediaSourceEngine.init(initObject, false).then(() => {
         return mediaSourceEngine.appendBuffer(
             ContentType.VIDEO, buffer, null, null,
@@ -524,11 +542,16 @@ describe('MediaSourceEngine', function() {
       const initObject = new Map();
       initObject.set(ContentType.VIDEO, fakeTransportStream);
 
+      const output = {
+        data: new Uint8Array(1),
+        captions: [],
+      };
+      mockTransmuxer.transmux.and.returnValue(Promise.resolve(output));
+
       mediaSourceEngine.init(initObject, false).then(() => {
         return mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null,
             null, /* hasClosedCaptions */ false);
       }).then(() => {
-        expect(mockTextEngine.appendCues).not.toHaveBeenCalled();
         expect(videoSourceBuffer.appendBuffer).toHaveBeenCalled();
       }).catch(fail).then(done);
 
@@ -1179,14 +1202,19 @@ describe('MediaSourceEngine', function() {
   }
 
   function createMockTextEngineCtor() {
-    let ctor = jasmine.createSpy('TextEngine');
-    ctor.isTypeSupported = function() { return true; };
+    const ctor = jasmine.createSpy('TextEngine');
+    ctor['isTypeSupported'] = () => true;
+    // Because this is a fake constructor, it must be callable with "new".
+    // This will cause jasmine to invoke the callback with "new" as well, so
+    // the callback must be a "function".  This detail is hidden when babel
+    // transpiles the tests.
+    // eslint-disable-next-line prefer-arrow-callback, no-restricted-syntax
     ctor.and.callFake(function() {
       expect(mockTextEngine).toBeFalsy();
       mockTextEngine = jasmine.createSpyObj('TextEngine', [
         'initParser', 'destroy', 'appendBuffer', 'remove', 'setTimestampOffset',
         'setAppendWindow', 'bufferStart', 'bufferEnd', 'bufferedAheadOf',
-        'appendCues', 'storeAndAppendClosedCaptions',
+        'storeAndAppendClosedCaptions',
       ]);
 
       let resolve = Promise.resolve.bind(Promise);

@@ -71,8 +71,23 @@ shaka.ui.TextDisplayer = class {
    * @export
    */
   append(cues) {
-    // Add the cues.
-    this.cues_ = this.cues_.concat(cues);
+    for (const cue of cues) {
+      // When a VTT cue spans a segment boundary, the cue will be duplicated
+      // into two segments.
+      // To avoid displaying duplicate cues, if the current cue list already
+      // contains the cue, skip it.
+      const containsCue = this.cues_.some((cueInList) => {
+        if (cueInList.payload == cue.payload &&
+            cueInList.startTime == cue.startTime &&
+            cueInList.endTime == cue.endTime) {
+          return true;
+        }
+        return false;
+      });
+      if (!containsCue) {
+        this.cues_.push(cue);
+      }
+    }
   }
 
 
@@ -105,25 +120,11 @@ shaka.ui.TextDisplayer = class {
       return false;
     }
 
-    // Remove the cues out of the time range from the map, and remove the
-    // captions from the page.
-    const cuesToRemove = new Set();
-    for (const cue of this.cues_) {
-      if (cue.startTime > start && cue.endTime < end) {
-        cuesToRemove.add(cue);
-      }
-    }
-
-    for (const cue of cuesToRemove) {
-        const captions = this.currentCuesMap_.get(cue);
-        if (captions) {
-          this.textContainer_.removeChild(captions);
-          this.currentCuesMap_.delete(cue);
-        }
-    }
-
     // Remove the cues out of the time range.
-    this.cues_ = this.cues_.filter((cue) => !cuesToRemove.has(cue));
+    this.cues_ = this.cues_.filter(
+        (cue) => cue.startTime < start || cue.endTime >= end);
+    this.updateCaptions_();
+
     return true;
   }
 
@@ -153,17 +154,26 @@ shaka.ui.TextDisplayer = class {
 
     // Return true if the cue should be displayed at the current time point.
     const shouldCueBeDisplayed = (cue) => {
-      return this.isTextVisible_ &&
+      return this.cues_.includes(cue) && this.isTextVisible_ &&
              cue.startTime <= currentTime && cue.endTime >= currentTime;
     };
 
     // For each cue in the current cues map, if the cue's end time has passed,
     // remove the entry from the map, and remove the captions from the page.
     for (const cue of this.currentCuesMap_.keys()) {
-        if (!shouldCueBeDisplayed(cue)) {
+      if (!shouldCueBeDisplayed(cue)) {
         const captions = this.currentCuesMap_.get(cue);
         this.textContainer_.removeChild(captions);
         this.currentCuesMap_.delete(cue);
+      }
+    }
+
+    // Sometimes we don't remove a cue element correctly.  So check all the
+    // child nodes and remove any that don't have an associated cue.
+    const expectedChildren = new Set(this.currentCuesMap_.values());
+    for (const child of Array.from(this.textContainer_.childNodes)) {
+      if (!expectedChildren.has(child)) {
+        this.textContainer_.removeChild(child);
       }
     }
 
@@ -190,16 +200,20 @@ shaka.ui.TextDisplayer = class {
    *
    * @param {Element} container
    * @param {!shaka.extern.Cue} cue
-   * @return {Element} the created captions container
+   * @param {boolean} isNested
+   * @return {!Element} the created captions container
    * @private
    */
-  displayNestedCue_(container, cue) {
-      const captions = shaka.util.Dom.createHTMLElement('span');
+  displayLeafCue_(container, cue, isNested) {
+    const captions = shaka.util.Dom.createHTMLElement('span');
+    if (isNested) {
+      captions.classList.add('shaka-nested-cue');
+    }
 
     if (cue.spacer) {
       captions.style.display = 'block';
     } else {
-      this.setCaptionStyles_(captions, cue);
+      this.setCaptionStyles_(captions, cue, /* isLeaf= */ true);
     }
 
     container.appendChild(captions);
@@ -218,33 +232,37 @@ shaka.ui.TextDisplayer = class {
     if (cue.nestedCues.length) {
       const nestedCuesContainer = shaka.util.Dom.createHTMLElement('p');
       nestedCuesContainer.style.width = '100%';
-      this.setCaptionStyles_(nestedCuesContainer, cue);
+      this.setCaptionStyles_(nestedCuesContainer, cue, /* isLeaf= */ false);
 
       for (let i = 0; i < cue.nestedCues.length; i++) {
-        this.displayNestedCue_(nestedCuesContainer, cue.nestedCues[i]);
+        this.displayLeafCue_(
+            nestedCuesContainer, cue.nestedCues[i], /* isNested= */ true);
       }
 
       container.appendChild(nestedCuesContainer);
       this.currentCuesMap_.set(cue, nestedCuesContainer);
     } else {
-      this.currentCuesMap_.set(cue, this.displayNestedCue_(container, cue));
+      this.currentCuesMap_.set(cue,
+          this.displayLeafCue_(container, cue, /* isNested= */ false));
     }
   }
 
   /**
    * @param {!HTMLElement} captions
    * @param {!shaka.extern.Cue} cue
+   * @param {boolean} isLeaf
    * @private
    */
-  setCaptionStyles_(captions, cue) {
+  setCaptionStyles_(captions, cue, isLeaf) {
     const Cue = shaka.text.Cue;
     const captionsStyle = captions.style;
-    const panelStyle = this.textContainer_.style;
 
     // Set white-space to 'pre-line' to enable showing line breaks in the text.
     captionsStyle.whiteSpace = 'pre-line';
     captions.textContent = cue.payload;
-    captionsStyle.backgroundColor = cue.backgroundColor;
+    if (isLeaf) {
+      captionsStyle.backgroundColor = cue.backgroundColor;
+    }
     captionsStyle.color = cue.color;
     captionsStyle.direction = cue.direction;
 
@@ -269,11 +287,29 @@ shaka.ui.TextDisplayer = class {
     // captions inside the text container. Before means at the top of the
     // text container, and after means at the bottom.
     if (cue.displayAlign == Cue.displayAlign.BEFORE) {
-      panelStyle.justifyContent = 'flex-start';
+      captionsStyle.justifyContent = 'flex-start';
     } else if (cue.displayAlign == Cue.displayAlign.CENTER) {
-      panelStyle.justifyContent = 'center';
+      captionsStyle.justifyContent = 'center';
     } else {
-      panelStyle.justifyContent = 'flex-end';
+      captionsStyle.justifyContent = 'flex-end';
+    }
+
+    if (cue.nestedCues.length) {
+      captionsStyle.display = 'flex';
+      captionsStyle.flexDirection = 'row';
+      captionsStyle.margin = '0';
+      // Setting flexDirection to "row" inverts the sense of align and justify.
+      // Now align is vertical and justify is horizontal.  See comments above on
+      // vertical alignment for displayAlign.
+      captionsStyle.alignItems = captionsStyle.justifyContent;
+      captionsStyle.justifyContent = 'center';
+    }
+
+    if (isLeaf) {
+      // Work around an IE 11 flexbox bug in which center-aligned items can
+      // overflow their container.  See
+      // https://github.com/philipwalton/flexbugs/tree/6e720da8#flexbug-2
+      captionsStyle.maxWidth = '100%';
     }
 
     captionsStyle.fontFamily = cue.fontFamily;
@@ -300,26 +336,38 @@ shaka.ui.TextDisplayer = class {
     // TODO: Implement lineAlignment of 'CENTER'.
     if (cue.line) {
       if (cue.lineInterpretation == Cue.lineInterpretation.PERCENTAGE) {
+        captionsStyle.position = 'absolute';
         if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            panelStyle.top = cue.line + '%';
+            captionsStyle.top = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            panelStyle.bottom = cue.line + '%';
+            captionsStyle.bottom = cue.line + '%';
           }
         } else if (cue.writingMode == Cue.writingMode.VERTICAL_LEFT_TO_RIGHT) {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            panelStyle.left = cue.line + '%';
+            captionsStyle.left = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            panelStyle.right = cue.line + '%';
+            captionsStyle.right = cue.line + '%';
           }
         } else {
           if (cue.lineAlign == Cue.lineAlign.START) {
-            panelStyle.right = cue.line + '%';
+            captionsStyle.right = cue.line + '%';
           } else if (cue.lineAlign == Cue.lineAlign.END) {
-            panelStyle.left = cue.line + '%';
+            captionsStyle.left = cue.line + '%';
           }
         }
       }
+    } else if (cue.region && cue.region.id && !isLeaf) {
+      const percentageUnit = shaka.text.CueRegion.units.PERCENTAGE;
+      const heightUnit = cue.region.heightUnits == percentageUnit ? '%' : 'px';
+      const widthUnit = cue.region.widthUnits == percentageUnit ? '%' : 'px';
+      const viewportAnchorUnit =
+          cue.region.viewportAnchorUnits == percentageUnit ? '%' : 'px';
+      captionsStyle.height = cue.region.height + heightUnit;
+      captionsStyle.width = cue.region.width + widthUnit;
+      captionsStyle.position = 'absolute';
+      captionsStyle.top = cue.region.viewportAnchorY + viewportAnchorUnit;
+      captionsStyle.left = cue.region.viewportAnchorX + viewportAnchorUnit;
     }
 
     captionsStyle.lineHeight = cue.lineHeight;
@@ -328,20 +376,18 @@ shaka.ui.TextDisplayer = class {
     // direction defined by the writing direction.
     if (cue.position) {
       if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
-        panelStyle.paddingLeft = cue.position;
+        captionsStyle.paddingLeft = cue.position;
       } else {
-        panelStyle.paddingTop = cue.position;
+        captionsStyle.paddingTop = cue.position;
       }
     }
 
     // The positionAlign attribute is an alignment for the text container in
     // the dimension of the writing direction.
     if (cue.positionAlign == Cue.positionAlign.LEFT) {
-      panelStyle.cssFloat = 'left';
+      captionsStyle.cssFloat = 'left';
     } else if (cue.positionAlign == Cue.positionAlign.RIGHT) {
-      panelStyle.cssFloat = 'right';
-    } else {
-      panelStyle.margin = 'auto';
+      captionsStyle.cssFloat = 'right';
     }
 
     captionsStyle.textAlign = cue.textAlign;
@@ -351,10 +397,12 @@ shaka.ui.TextDisplayer = class {
     // The size is a number giving the size of the text container, to be
     // interpreted as a percentage of the video, as defined by the writing
     // direction.
-    if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
-      panelStyle.width = cue.size + '%';
-    } else {
-      panelStyle.height = cue.size + '%';
+    if (cue.size) {
+      if (cue.writingMode == Cue.writingMode.HORIZONTAL_TOP_TO_BOTTOM) {
+        captionsStyle.width = cue.size + '%';
+      } else {
+        captionsStyle.height = cue.size + '%';
+      }
     }
   }
 };

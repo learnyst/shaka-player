@@ -157,7 +157,8 @@ describe('DrmEngine', function() {
       const variants = Periods.getAllVariantsFrom(manifest.periods);
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       expect(drmEngine.initialized()).toBe(true);
-      expect(drmEngine.keySystem()).toBe('drm.abc');
+      expect(shaka.media.DrmEngine.keySystem(drmEngine.getDrmInfo()))
+          .toBe('drm.abc');
 
       // Only one call, since the first key system worked.
       expect(requestMediaKeySystemAccessSpy.calls.count()).toBe(1);
@@ -258,6 +259,7 @@ describe('DrmEngine', function() {
       expect(drmEngine.initialized()).toBe(true);
       expect(drmEngine.willSupport('audio/webm')).toBeTruthy();
       expect(drmEngine.willSupport('video/mp4; codecs="fake"')).toBeTruthy();
+      expect(drmEngine.willSupport('video/mp4; codecs="FAKE"')).toBeTruthy();
 
       // Because DrmEngine will err on being too accepting, make sure it will
       // reject something. However, we can only check that it is actually
@@ -275,7 +277,8 @@ describe('DrmEngine', function() {
       const variants = Periods.getAllVariantsFrom(manifest.periods);
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       expect(drmEngine.initialized()).toBe(true);
-      expect(drmEngine.keySystem()).toBe('drm.def');
+      expect(shaka.media.DrmEngine.keySystem(drmEngine.getDrmInfo()))
+          .toBe('drm.def');
 
       // Both key systems were tried, since the first one failed.
       expect(requestMediaKeySystemAccessSpy.calls.count()).toBe(2);
@@ -480,8 +483,8 @@ describe('DrmEngine', function() {
       const variants = Periods.getAllVariantsFrom(manifest.periods);
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       expect(drmEngine.initialized()).toBe(true);
-      expect(drmEngine.keySystem()).toBe('');
-      expect(requestMediaKeySystemAccessSpy.calls.count()).toBe(0);
+      expect(shaka.media.DrmEngine.keySystem(drmEngine.getDrmInfo())).toBe('');
+      expect(requestMediaKeySystemAccessSpy).not.toHaveBeenCalled();
     });
 
     it('makes queries for clear content if key is configured', async () => {
@@ -496,8 +499,9 @@ describe('DrmEngine', function() {
       const variants = Periods.getAllVariantsFrom(manifest.periods);
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       expect(drmEngine.initialized()).toBe(true);
-      expect(drmEngine.keySystem()).toBe('drm.abc');
-      expect(requestMediaKeySystemAccessSpy.calls.count()).toBe(1);
+      expect(shaka.media.DrmEngine.keySystem(drmEngine.getDrmInfo()))
+          .toBe('drm.abc');
+      expect(requestMediaKeySystemAccessSpy).toHaveBeenCalledTimes(1);
     });
 
     it('uses advanced config to fill in DrmInfo', async () => {
@@ -686,12 +690,12 @@ describe('DrmEngine', function() {
 
       initAndAttach().then(function() {
         expect(mockMediaKeys.createSession.calls.count()).toBe(3);
-        expect(session1.generateRequest).
-            toHaveBeenCalledWith('cenc', initData1.buffer);
-        expect(session2.generateRequest).
-            toHaveBeenCalledWith('webm', initData2.buffer);
-        expect(session3.generateRequest).
-            toHaveBeenCalledWith('cenc', initData3.buffer);
+        expect(session1.generateRequest)
+            .toHaveBeenCalledWith('cenc', initData1);
+        expect(session2.generateRequest)
+            .toHaveBeenCalledWith('webm', initData2);
+        expect(session3.generateRequest)
+            .toHaveBeenCalledWith('cenc', initData3);
       }).catch(fail).then(done);
     });
 
@@ -713,9 +717,29 @@ describe('DrmEngine', function() {
 
       initAndAttach().then(function() {
         expect(mockMediaKeys.createSession.calls.count()).toBe(1);
-        expect(session1.generateRequest).
-            toHaveBeenCalledWith('cenc', initData1.buffer);
+        expect(session1.generateRequest)
+            .toHaveBeenCalledWith('cenc', initData1);
       }).catch(fail).then(done);
+    });
+
+    // https://github.com/google/shaka-player/issues/2754
+    it('ignores duplicate init data from newInitData', async () => {
+      /** @type {!Uint8Array} */
+      const initData = new Uint8Array(1);
+
+      tweakDrmInfos((drmInfos) => {
+        drmInfos[0].initData =
+            [{initData: initData, initDataType: 'cenc', keyId: 'abc'}];
+      });
+
+      await drmEngine.initForPlayback(
+          manifest.periods[0].variants, manifest.offlineSessionIds);
+      drmEngine.newInitData('cenc', initData);
+      await drmEngine.attach(mockVideo);
+
+      expect(mockMediaKeys.createSession).toHaveBeenCalledTimes(1);
+      expect(session1.generateRequest)
+          .toHaveBeenCalledWith('cenc', initData);
     });
 
     it('uses clearKeys config to override DrmInfo', async () => {
@@ -745,8 +769,8 @@ describe('DrmEngine', function() {
       expect(manifest.periods[0].variants[0].drmInfos[0].keySystem).
           toBe('org.w3.clearkey');
 
-      expect(session.generateRequest).
-          toHaveBeenCalledWith('keyids', jasmine.any(ArrayBuffer));
+      expect(session.generateRequest)
+          .toHaveBeenCalledWith('keyids', jasmine.any(Uint8Array));
 
       let initData = JSON.parse(shaka.util.StringUtils.fromUTF8(
           session.generateRequest.calls.argsFor(0)[1]));
@@ -756,6 +780,37 @@ describe('DrmEngine', function() {
           Uint8ArrayUtils.fromBase64(initData.kids[1]));
       expect(keyId1).toBe('deadbeefdeadbeefdeadbeefdeadbeef');
       expect(keyId2).toBe('02030507011013017019023029031037');
+    });
+
+    // Regression test for #2139, in which we suppressed errors if drmInfos was
+    // empty and clearKeys config was given
+    it('fails if clearKeys config fails', async () => {
+      manifest.periods[0].variants[0].drmInfos = [];
+
+      // Make it so that clear key setup fails by pretending we don't have it.
+      // In reality, it was failing because of missing codec info, but any
+      // failure should do for testing purposes.
+      requestMediaKeySystemAccessSpy.and.callFake(
+          fakeRequestMediaKeySystemAccess.bind(null, []));
+
+      // Configure clear keys (map of hex key IDs to keys)
+      config.clearKeys = {
+        'deadbeefdeadbeefdeadbeefdeadbeef': '18675309186753091867530918675309',
+        '02030507011013017019023029031037': '03050701302303204201080425098033',
+      };
+      drmEngine.configure(config);
+
+      const variants = Periods.getAllVariantsFrom(manifest.periods);
+
+      try {
+        await drmEngine.initForPlayback(variants, []);
+        fail();
+      } catch (error) {
+        shaka.test.Util.expectToEqualError(error, new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.DRM,
+          shaka.util.Error.Code.REQUESTED_KEY_SYSTEM_CONFIG_UNAVAILABLE));
+      }
     });
 
     it('fails with an error if setMediaKeys fails', async () => {
@@ -843,10 +898,10 @@ describe('DrmEngine', function() {
             {initDataType: 'cenc', initData: initData2, keyId: null});
 
         expect(mockMediaKeys.createSession.calls.count()).toBe(2);
-        expect(session1.generateRequest).
-            toHaveBeenCalledWith('webm', initData1.buffer);
-        expect(session2.generateRequest).
-            toHaveBeenCalledWith('cenc', initData2.buffer);
+        expect(session1.generateRequest)
+            .toHaveBeenCalledWith('webm', initData1);
+        expect(session2.generateRequest)
+            .toHaveBeenCalledWith('cenc', initData2);
       });
 
       it('suppresses duplicate initDatas', async () => {
@@ -860,8 +915,8 @@ describe('DrmEngine', function() {
             {initDataType: 'cenc', initData: initData2, keyId: null});
 
         expect(mockMediaKeys.createSession.calls.count()).toBe(1);
-        expect(session1.generateRequest).
-            toHaveBeenCalledWith('webm', initData1.buffer);
+        expect(session1.generateRequest)
+            .toHaveBeenCalledWith('webm', initData1);
       });
 
       it('is ignored when init data is in DrmInfo', async () => {
@@ -1442,7 +1497,7 @@ describe('DrmEngine', function() {
       p.resolve();  // Success for drm.abc.
       await shaka.test.Util.delay(1.5);
       // Due to the interruption, we never created MediaKeys.
-      expect(drmEngine.keySystem()).toBe('');
+      expect(shaka.media.DrmEngine.keySystem(drmEngine.getDrmInfo())).toBe('');
       expect(drmEngine.initialized()).toBe(false);
     });
 
@@ -2087,5 +2142,15 @@ describe('DrmEngine', function() {
    */
   function keyStatusBatchTime() {
     return shaka.media.DrmEngine.KEY_STATUS_BATCH_TIME_;
+  }
+
+  /**
+   * @param {function(!Array.<shaka.extern.DrmInfo>)} callback
+   */
+  function tweakDrmInfos(callback) {
+    if (manifest.periods[0].variants[0].video.encrypted ||
+        manifest.periods[0].variants[0].audio.encrypted) {
+      callback(manifest.periods[0].variants[0].drmInfos);
+    }
   }
 });

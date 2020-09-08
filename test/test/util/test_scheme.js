@@ -126,6 +126,31 @@ shaka.test.TestScheme.DATA = {
     duration: 30,
   },
 
+  // Like 'sintel', but much longer to test buffering and seeking.
+  'sintel_long': {
+    video: {
+      initSegmentUri: '/base/test/test/assets/sintel-video-init.mp4',
+      mdhdOffset: 0x1ba,
+      segmentUri: '/base/test/test/assets/sintel-video-segment.mp4',
+      tfdtOffset: 0x38,
+      segmentDuration: 10,
+      presentationTimeOffset: 0,
+      mimeType: 'video/mp4',
+      codecs: 'avc1.42c01e',
+    },
+    audio: {
+      initSegmentUri: '/base/test/test/assets/sintel-audio-init.mp4',
+      mdhdOffset: 0x1b6,
+      segmentUri: '/base/test/test/assets/sintel-audio-segment.mp4',
+      tfdtOffset: 0x3c,
+      segmentDuration: 10.005,
+      presentationTimeOffset: 0,
+      mimeType: 'audio/mp4',
+      codecs: 'mp4a.40.2',
+    },
+    duration: 300,
+  },
+
   // Like 'sintel' above, but with a non-zero period start time.
   // This helps expose edge cases around startup and live streams.
   'sintel_start_at_3': {
@@ -466,9 +491,25 @@ shaka.test.TestScheme.createManifests = function(shaka, suffix) {
     }
 
     if (data.licenseServers) {
-      for (let keySystem in data.licenseServers) {
-        manifestGenerator.addDrmInfo(keySystem)
-            .licenseServerUri(data.licenseServers[keySystem]);
+      // Real content typically doesn't contain license server URLs, but if it
+      // does, we use them in preference over everything else.  There is a
+      // config to override that for DASH, but this test utility isn't DASH
+      // and that player config wouldn't do any good for a test case.
+      //
+      // So, we don't put the specific license servers into the manifest
+      // structure.  That should always be done in the player config instead,
+      // and we have the static setupPlayer() method above to do that in
+      // tests.
+      //
+      // Instead, we place generic DrmInfo for all common key systems here,
+      // and tests can use any of them by configuring a license server.
+      const commonKeySystems = [
+        'com.apple.fps.1_0',
+        'com.microsoft.playready',
+        'com.widevine.alpha',
+      ];
+      for (const keySystem of commonKeySystems) {
+        manifestGenerator.addDrmInfo(keySystem);
         if (data[contentType].initData) {
           manifestGenerator.addCencInitData(data[contentType].initData);
         }

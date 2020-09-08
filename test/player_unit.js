@@ -66,6 +66,7 @@ describe('Player', function() {
     logErrorSpy = jasmine.createSpy('shaka.log.error');
     logErrorSpy.calls.reset();
     shaka.log.error = shaka.test.Util.spyFunc(logErrorSpy);
+    shaka.log.alwaysError = shaka.test.Util.spyFunc(logErrorSpy);
 
     logWarnSpy = jasmine.createSpy('shaka.log.warning');
     logErrorSpy.and.callFake(fail);
@@ -148,6 +149,7 @@ describe('Player', function() {
       await player.destroy();
     } finally {
       shaka.log.error = originalLogError;
+      shaka.log.alwaysError = originalLogError;
       shaka.log.warning = originalLogWarn;
       shaka.log.alwaysWarn = originalLogAlwaysWarn;
       window.MediaSource.isTypeSupported = originalIsTypeSupported;
@@ -418,6 +420,19 @@ describe('Player', function() {
       expect(newConfig).toEqual(defaultConfig);
       expect(logErrorSpy).toHaveBeenCalledWith(
           stringContaining('.streaming'));
+    });
+
+    it('accepts synchronous function values for async function fields', () => {
+      const defaultConfig = player.getConfiguration();
+
+      // Make sure the default is async, or the test is invalid.
+      const AsyncFunction = (async () => {}).constructor;
+      expect(defaultConfig.offline.trackSelectionCallback.constructor)
+          .toBe(AsyncFunction);
+
+      // Try a synchronous callback.
+      player.configure('offline.trackSelectionCallback', () => {});
+      // If this fails, an error log will trigger test failure.
     });
 
     it('expands dictionaries that allow arbitrary keys', function() {
@@ -923,14 +938,17 @@ describe('Player', function() {
             .language('en')
             .addVideo(1).originalId('video-1kbps').bandwidth(1000)
               .size(100, 200).frameRate(1000000 / 42000)
+              .pixelAspectRatio('59:54')
+              .roles(['main'])
             .addAudio(3).originalId('audio-en-6c').bandwidth(300)
-              .channelsCount(6).roles(['main'])
+              .channelsCount(6).roles(['main']).audioSamplingRate(48000)
 
           .addVariant(101)  // main surround, high res
             .bandwidth(2300)
             .language('en')
             .addVideo(2).originalId('video-2kbps').bandwidth(2000)
               .size(200, 400).frameRate(24)
+              .pixelAspectRatio('59:54')
             .addExistingStream(3)  // audio
 
           .addVariant(102)  // main stereo, low res
@@ -938,7 +956,7 @@ describe('Player', function() {
             .language('en')
             .addExistingStream(1)  // video
             .addAudio(4).originalId('audio-en-2c').bandwidth(100)
-              .channelsCount(2).roles(['main'])
+              .channelsCount(2).roles(['main']).audioSamplingRate(48000)
 
           .addVariant(103)  // main stereo, high res
             .bandwidth(2100)
@@ -951,7 +969,7 @@ describe('Player', function() {
             .language('en')
             .addExistingStream(1)  // video
             .addAudio(5).originalId('audio-commentary').bandwidth(100)
-              .channelsCount(2).roles(['commentary'])
+              .channelsCount(2).roles(['commentary']).audioSamplingRate(48000)
 
           .addVariant(105)  // commentary stereo, low res
             .bandwidth(2100)
@@ -964,7 +982,7 @@ describe('Player', function() {
             .bandwidth(1100)
             .addExistingStream(1)  // video
             .addAudio(6).originalId('audio-es').bandwidth(100)
-              .channelsCount(2)
+              .channelsCount(2).audioSamplingRate(48000)
 
           .addVariant(107)  // spanish stereo, high res
             .language('es')
@@ -990,12 +1008,16 @@ describe('Player', function() {
             .bandwidth(1100)
             .language('en')
             .addVideo(10).bandwidth(1000).size(100, 200)
-            .addAudio(11).bandwidth(100).channelsCount(2)
+            .addAudio(11)
+              .bandwidth(100).channelsCount(2)
+              .audioSamplingRate(48000)
           .addVariant(201)
             .bandwidth(1300)
             .language('en')
             .addExistingStream(10)  // video
-            .addAudio(12).bandwidth(300).channelsCount(6)
+            .addAudio(12)
+              .bandwidth(300).channelsCount(6)
+              .audioSamplingRate(48000)
         .build();
 
       variantTracks = [
@@ -1010,6 +1032,7 @@ describe('Player', function() {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1020,6 +1043,7 @@ describe('Player', function() {
           videoId: 1,
           audioId: 3,
           channelsCount: 6,
+          audioSamplingRate: 48000,
           audioBandwidth: 300,
           videoBandwidth: 1000,
           originalAudioId: 'audio-en-6c',
@@ -1037,6 +1061,7 @@ describe('Player', function() {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1047,6 +1072,7 @@ describe('Player', function() {
           videoId: 2,
           audioId: 3,
           channelsCount: 6,
+          audioSamplingRate: 48000,
           audioBandwidth: 300,
           videoBandwidth: 2000,
           originalAudioId: 'audio-en-6c',
@@ -1064,6 +1090,7 @@ describe('Player', function() {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1074,6 +1101,7 @@ describe('Player', function() {
           videoId: 1,
           audioId: 4,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-en-2c',
@@ -1091,6 +1119,7 @@ describe('Player', function() {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1101,6 +1130,7 @@ describe('Player', function() {
           videoId: 2,
           audioId: 4,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-en-2c',
@@ -1118,16 +1148,18 @@ describe('Player', function() {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
           videoCodec: 'avc1.4d401f',
           primary: false,
-          roles: ['commentary'],
+          roles: ['commentary', 'main'],
           audioRoles: ['commentary'],
           videoId: 1,
           audioId: 5,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-commentary',
@@ -1145,6 +1177,7 @@ describe('Player', function() {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1155,6 +1188,7 @@ describe('Player', function() {
           videoId: 2,
           audioId: 5,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-commentary',
@@ -1172,16 +1206,18 @@ describe('Player', function() {
           width: 100,
           height: 200,
           frameRate: 1000000 / 42000,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
           videoCodec: 'avc1.4d401f',
           primary: false,
-          roles: [],
+          roles: ['main'],
           audioRoles: [],
           videoId: 1,
           audioId: 6,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 1000,
           originalAudioId: 'audio-es',
@@ -1199,6 +1235,7 @@ describe('Player', function() {
           width: 200,
           height: 400,
           frameRate: 24,
+          pixelAspectRatio: '59:54',
           mimeType: 'video/mp4',
           codecs: 'avc1.4d401f, mp4a.40.2',
           audioCodec: 'mp4a.40.2',
@@ -1209,6 +1246,7 @@ describe('Player', function() {
           videoId: 2,
           audioId: 6,
           channelsCount: 2,
+          audioSamplingRate: 48000,
           audioBandwidth: 100,
           videoBandwidth: 2000,
           originalAudioId: 'audio-es',
@@ -1233,12 +1271,14 @@ describe('Player', function() {
           roles: [],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1260,12 +1300,14 @@ describe('Player', function() {
           roles: ['main'],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1287,12 +1329,14 @@ describe('Player', function() {
           roles: ['commentary'],
           audioRoles: null,
           channelsCount: null,
+          audioSamplingRate: null,
           audioBandwidth: null,
           videoBandwidth: null,
           bandwidth: 0,
           width: null,
           height: null,
           frameRate: null,
+          pixelAspectRatio: null,
           videoId: null,
           audioId: null,
           originalAudioId: null,
@@ -1483,6 +1527,23 @@ describe('Player', function() {
       expect(args[0].audio.roles).toContain('commentary');
       expect(args[1]).toBe(true);
       expect(getActiveVariantTrack().roles).toContain('commentary');
+    });
+
+    it('selectAudioLanguage() applies role only to audio', () => {
+      streamingEngine.onCanSwitch();
+      expect(getActiveVariantTrack().roles).not.toContain('commentary');
+      player.selectAudioLanguage('en', 'commentary');
+      let args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].audio.roles).toContain('commentary');
+      expect(args[0].video.roles).toContain('main');
+
+      // Switch audio role from 'commentary' to 'main'.
+      streamingEngine.switchVariant.calls.reset();
+      player.selectAudioLanguage('en', 'main');
+      expect(streamingEngine.switchVariant).toHaveBeenCalled();
+      args = streamingEngine.switchVariant.calls.argsFor(0);
+      expect(args[0].audio.roles).toContain('main');
+      expect(args[0].video.roles).toContain('main');
     });
 
     it('selectAudioLanguage() does not change selected text track', function() {
@@ -1849,10 +1910,11 @@ describe('Player', function() {
       let stats = player.getStats();
       expect(stats.decodedFrames).toBeNaN();
       expect(stats.droppedFrames).toBeNaN();
+      expect(stats.corruptedFrames).toBeNaN();
 
       video.getVideoPlaybackQuality = function() {
         return {
-          corruptedVideoFrames: 0,
+          corruptedVideoFrames: 10,
           creationTime: 0,
           totalFrameDelay: 0,
           totalVideoFrames: 75,
@@ -1864,6 +1926,7 @@ describe('Player', function() {
       stats = player.getStats();
       expect(stats.decodedFrames).toBe(75);
       expect(stats.droppedFrames).toBe(125);
+      expect(stats.corruptedFrames).toBe(10);
     });
 
     describe('buffer/play times', function() {
@@ -2440,6 +2503,27 @@ describe('Player', function() {
       expect(tracks[0].id).toBe(2);
     });
 
+    // https://github.com/google/shaka-player/issues/2135
+    it('updates key statuses for multi-Period content', async () => {
+      manifest = new shaka.test.ManifestGenerator()
+          .addPeriod(0)
+            .addVariant(0)
+              .addVideo(1).keyId('abc')
+          .addPeriod(10)
+            .addVariant(2)
+              .addVideo(3).keyId('abc')
+            .addVariant(4)
+              .addVideo(5).keyId('def')
+          .build();
+
+      await setupPlayer();
+      onKeyStatus({'abc': 'usable'});
+
+      expect(manifest.periods[0].variants[0].allowedByKeySystem).toBe(true);
+      expect(manifest.periods[1].variants[0].allowedByKeySystem).toBe(true);
+      expect(manifest.periods[1].variants[1].allowedByKeySystem).toBe(false);
+    });
+
     it('does not restrict if no key statuses are available', async () => {
       manifest = new shaka.test.ManifestGenerator()
               .addPeriod(0)
@@ -2724,10 +2808,14 @@ describe('Player', function() {
           .addPeriod(0)
             // Surround sound AC-3, preferred by config
             .addVariant(0).bandwidth(300)
-              .addAudio(0).channelsCount(6).mime('audio/mp4', 'ac-3')
+              .addAudio(0)
+                .channelsCount(6).mime('audio/mp4', 'ac-3')
+                .audioSamplingRate(48000)
             // Stereo AAC, would win out based on bandwidth alone
             .addVariant(1).bandwidth(100)
-              .addAudio(1).channelsCount(2).mime('audio/mp4', 'mp4a.40.2')
+              .addAudio(1)
+                .channelsCount(2).mime('audio/mp4', 'mp4a.40.2')
+                .audioSamplingRate(48000)
           .build();
 
       // Configure for 6 channels.
@@ -2772,9 +2860,12 @@ describe('Player', function() {
       await player.load(fakeManifestUri, 0, factory);
     });
 
-    it('gets current wall clock time in UTC', function() {
-      let liveTimeUtc = player.getPlayheadTimeAsDate();
-      expect(liveTimeUtc).toEqual(new Date(320000));
+    it('gets current wall clock time in UTC', () => {
+      playhead.getTime.and.returnValue(20);
+
+      const liveTimeUtc = player.getPlayheadTimeAsDate();
+      // (300 (presentation start time) + 20 (playhead time)) * 1000 (ms/sec)
+      expect(liveTimeUtc).toEqual(new Date(320 * 1000));
     });
   });
 

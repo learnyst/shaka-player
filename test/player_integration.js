@@ -24,9 +24,9 @@ describe('Player', function() {
 
   /** @type {!HTMLVideoElement} */
   let video;
-  /** @type {shaka.Player} */
+  /** @type {!shaka.Player} */
   let player;
-  /** @type {shaka.util.EventManager} */
+  /** @type {!shaka.util.EventManager} */
   let eventManager;
 
   let compiledShaka;
@@ -36,10 +36,10 @@ describe('Player', function() {
     document.body.appendChild(video);
 
     compiledShaka = await Util.loadShaka(getClientArg('uncompiled'));
-    await shaka.test.TestScheme.createManifests(compiledShaka, '_compiled');
   });
 
-  beforeEach(function() {
+  beforeEach(async () => {
+    await shaka.test.TestScheme.createManifests(compiledShaka, '_compiled');
     player = new compiledShaka.Player(video);
 
     // Grab event manager from the uncompiled library:
@@ -92,12 +92,14 @@ describe('Player', function() {
 
         decodedFrames: jasmine.any(Number),
         droppedFrames: jasmine.any(Number),
+        corruptedFrames: jasmine.any(Number),
         estimatedBandwidth: jasmine.any(Number),
 
         loadLatency: jasmine.any(Number),
         playTime: jasmine.any(Number),
         pauseTime: jasmine.any(Number),
         bufferingTime: jasmine.any(Number),
+        licenseTime: jasmine.any(Number),
 
         // We should have loaded the first Period by now, so we should have a
         // history.
@@ -237,14 +239,17 @@ describe('Player', function() {
       displayer.appendSpy.and.callFake((added) => {
         cues = cues.concat(added);
       });
-      displayer.removeSpy.and.callFake(() => { cues = []; });
+
       player.configure({textDisplayFactory: () => displayer});
 
       const preferredTextLanguage = 'fa';  // The same as in the content itself
       player.configure({preferredTextLanguage: preferredTextLanguage});
 
       await player.load('test:sintel_realistic_compiled');
-      await Util.delay(1);  // Allow the first segments to be appended.
+
+      // Play until a time at which the external cues would be on screen.
+      video.play();
+      await waitUntilPlayheadReaches(eventManager, video, 4, 20);
 
       expect(player.isTextTrackVisible()).toBe(true);
       expect(displayer.isTextVisible()).toBe(true);
@@ -322,6 +327,23 @@ describe('Player', function() {
       // Cancelling trick play should return our playback rate to normal.
       player.cancelTrickPlay();
       expect(video.playbackRate).toBe(1);
+    });
+
+    // Regression test for #2326.
+    //
+    // 1. Construct an instance with a video element.
+    // 2. Don't call or await attach().
+    // 3. Call load() with a MIME type, which triggers a check for native
+    //    playback support.
+    //
+    // Note that a real playback may use a HEAD request to fetch a MIME type,
+    // even if one is not specified in load().
+    it('immediately after construction with MIME type', async () => {
+      const testSchemeMimeType = 'application/x-test-manifest';
+      player = new compiledShaka.Player(video);
+      await player.load('test:sintel_compiled', 0, testSchemeMimeType);
+      video.play();
+      await waitUntilPlayheadReaches(eventManager, video, 1, 10);
     });
 
     /**
@@ -539,6 +561,294 @@ describe('Player', function() {
       await canPlayThrough;
     });
   });
+
+  describe('loading', () => {
+    // A regression test for Issue #2433.
+    it('can load very large files', async () => {
+      // Reset the lazy function, so that it does not remember any chunk size
+      // that was detected beforehand.
+      compiledShaka.util.StringUtils.resetFromCharCode();
+      const oldFromCharCode = String.fromCharCode;
+      try {
+        // Replace String.fromCharCode with a version that can only handle very
+        // small chunks.
+        // This has to be an old-style function, to use the "arguments" object.
+        // eslint-disable-next-line no-restricted-syntax
+        String.fromCharCode = function() {
+          if (arguments.length > 2000) {
+            throw new RangeError('Synthetic Range Error');
+          }
+          // eslint-disable-next-line no-restricted-syntax
+          return oldFromCharCode.apply(null, arguments);
+        };
+        await player.load('/base/test/test/assets/large_file.mpd');
+      } finally {
+        String.fromCharCode = oldFromCharCode;
+      }
+    });
+  });
+
+  describe('buffering', () => {
+    const startBuffering = jasmine.objectContaining({buffering: true});
+    const endBuffering = jasmine.objectContaining({buffering: false});
+    /** @type {!jasmine.Spy} */
+    let onBuffering;
+    /** @type {!shaka.test.Waiter} */
+    let waiter;
+
+    beforeEach(() => {
+      onBuffering = jasmine.createSpy('onBuffering');
+      player.addEventListener('buffering', Util.spyFunc(onBuffering));
+
+      waiter = new shaka.test.Waiter(eventManager)
+          .timeoutAfter(10)
+          .failOnTimeout(true);
+    });
+
+    it('enters/exits buffering state at start', async () => {
+      // Set a large rebuffer goal to ensure we can see the buffering before
+      // we start playing.
+      player.configure('streaming.rebufferingGoal', 30);
+
+      await player.load('test:sintel_long_compiled');
+      video.pause();
+      expect(onBuffering).toHaveBeenCalledTimes(1);
+      expect(onBuffering).toHaveBeenCalledWith(startBuffering);
+      onBuffering.calls.reset();
+
+      await waiter.waitForEvent(player, 'buffering');
+      expect(onBuffering).toHaveBeenCalledTimes(1);
+      expect(onBuffering).toHaveBeenCalledWith(endBuffering);
+
+      expect(getBufferedAhead()).toBeGreaterThanOrEqual(30);
+    });
+
+    it('enters/exits buffering state while playing', async () => {
+      player.configure('streaming.rebufferingGoal', 1);
+      player.configure('streaming.bufferingGoal', 10);
+
+      await player.load('test:sintel_long_compiled');
+      video.pause();
+      if (player.isBuffering()) {
+        await waiter.waitForEvent(player, 'buffering');
+      }
+      onBuffering.calls.reset();
+
+      player.configure('streaming.rebufferingGoal', 30);
+      video.currentTime = 70;
+      await waiter.waitForEvent(player, 'buffering');
+      expect(onBuffering).toHaveBeenCalledTimes(1);
+      expect(onBuffering).toHaveBeenCalledWith(startBuffering);
+      onBuffering.calls.reset();
+
+      expect(getBufferedAhead()).toBeLessThan(30);
+
+      await waiter.waitForEvent(player, 'buffering');
+      expect(onBuffering).toHaveBeenCalledTimes(1);
+      expect(onBuffering).toHaveBeenCalledWith(endBuffering);
+
+      expect(getBufferedAhead()).toBeGreaterThanOrEqual(30);
+    });
+
+    it('buffers ahead of the playhead', async () => {
+      player.configure('streaming.bufferingGoal', 10);
+
+      await player.load('test:sintel_long_compiled');
+      video.pause();
+      await waitUntilBuffered(10);
+
+      player.configure('streaming.bufferingGoal', 30);
+      await waitUntilBuffered(30);
+
+      player.configure('streaming.bufferingGoal', 60);
+      await waitUntilBuffered(60);
+      await Util.delay(0.2);
+      expect(getBufferedAhead()).toBeLessThan(70);  // 60 + segment_size
+
+      // We don't remove buffered content ahead of the playhead, so seek to
+      // clear the buffer.
+      player.configure('streaming.bufferingGoal', 10);
+      video.currentTime = 120;
+      await waitUntilBuffered(10);
+      await Util.delay(0.2);
+      expect(getBufferedAhead()).toBeLessThan(20);  // 10 + segment_size
+    });
+
+    it('clears buffer behind playhead', async () => {
+      player.configure('streaming.bufferingGoal', 30);
+      player.configure('streaming.bufferBehind', 30);
+
+      await player.load('test:sintel_long_compiled');
+      video.pause();
+      await waitUntilBuffered(30);
+      video.currentTime = 20;
+      await waitUntilBuffered(30);
+
+      expect(getBufferedBehind()).toBe(20);  // Buffered to start still.
+      video.currentTime = 50;
+      await waitUntilBuffered(30);
+      expect(getBufferedBehind()).toBeLessThan(30);
+
+      player.configure('streaming.bufferBehind', 10);
+      // We only evict content when we append a segment, so increase the
+      // buffering goal so we append another segment.
+      player.configure('streaming.bufferingGoal', 40);
+      await waitUntilBuffered(40);
+      expect(getBufferedBehind()).toBeLessThan(10);
+    });
+
+    function getBufferedAhead() {
+      const end = shaka.media.TimeRangesUtils.bufferEnd(video.buffered);
+      return end - video.currentTime;
+    }
+
+    function getBufferedBehind() {
+      const start = shaka.media.TimeRangesUtils.bufferStart(video.buffered);
+      return video.currentTime - start;
+    }
+
+    async function waitUntilBuffered(amount) {
+      for (let i = 0; i < 25; i++) {
+        // We buffer from an internal segment, so this shouldn't take long to
+        // buffer.
+        await Util.delay(0.1);  // eslint-disable-line no-await-in-loop
+        if (getBufferedAhead() >= amount) {
+          return;
+        }
+      }
+      throw new Error('Timeout waiting to buffer');
+    }
+  });
+
+  describe('configuration', () => {
+    it('has the correct number of arguments in compiled callbacks', () => {
+      // Get the default configuration for both the compiled & uncompiled
+      // versions for comparison.
+      const compiledConfig = (new compiledShaka.Player()).getConfiguration();
+      const uncompiledConfig = (new shaka.Player()).getConfiguration();
+
+      compareConfigFunctions(compiledConfig, uncompiledConfig);
+
+      /**
+       * Find all the callbacks in the configuration recursively and compare
+       * their lengths (number of arguments).  We warn the app developer when a
+       * configured callback has the wrong number of arguments, so our own
+       * compiled versions must be correct.
+       *
+       * @param {Object} compiled
+       * @param {Object} uncompiled
+       * @param {string=} basePath The path to this point in the config, for
+       *   logging purposes.
+       */
+      function compareConfigFunctions(compiled, uncompiled, basePath = '') {
+        for (const key in uncompiled) {
+          const uncompiledValue = uncompiled[key];
+          const compiledValue = compiled[key];
+          const path = basePath + '.' + key;
+
+          if (uncompiledValue && uncompiledValue.constructor == Object) {
+            // This is an anonymous Object, so recurse on it.
+            compareConfigFunctions(compiledValue, uncompiledValue, path);
+          } else if (typeof uncompiledValue == 'function') {
+            // This is a function, so check its length.  The uncompiled version
+            // is considered canonically correct, so we use the uncompiled
+            // length as the expectation.
+            shaka.log.debug('[' + path + ']',
+                compiledValue.length, 'should be', uncompiledValue.length);
+            expect(compiledValue.length).toBe(uncompiledValue.length);
+          }
+        }
+      }
+    });
+  });  // describe('configuration')
+
+  describe('adaptation', () => {
+    /** @type {!shaka.test.FakeAbrManager} */
+    let abrManager;
+
+    beforeEach(() => {
+      abrManager = new shaka.test.FakeAbrManager();
+      player.configure('abrFactory', function() { return abrManager; });
+    });
+
+    it('fires "adaptation" event', async () => {
+      const abrEnabled = new Promise((resolve) => {
+        abrManager.enable.and.callFake(resolve);
+      });
+
+      await player.load('test:sintel_multi_lingual_multi_res_compiled');
+
+      expect(abrManager.switchCallback).toBeTruthy();
+      expect(abrManager.variants.length).toBeGreaterThan(1);
+      expect(abrManager.chooseIndex).toBe(0);
+
+      /** @type {shaka.test.Waiter} */
+      const waiter = new shaka.test.Waiter(eventManager)
+          .timeoutAfter(1).failOnTimeout(true);
+
+      await waiter.waitForPromise(abrEnabled, 'AbrManager enabled');
+
+      const p = waiter.waitForEvent(player, 'adaptation');
+      abrManager.switchCallback(abrManager.variants[1]);
+      await expectAsync(p).toBeResolved();
+    });
+
+    it('doesn\'t fire "adaptation" when not changing streams', async () => {
+      const abrEnabled = new Promise((resolve) => {
+        abrManager.enable.and.callFake(resolve);
+      });
+
+      await player.load('test:sintel_multi_lingual_multi_res_compiled');
+
+      expect(abrManager.switchCallback).toBeTruthy();
+
+      /** @type {shaka.test.Waiter} */
+      const waiter = new shaka.test.Waiter(eventManager)
+          .timeoutAfter(1).failOnTimeout(true);
+
+      await waiter.waitForPromise(abrEnabled, 'AbrManager enabled');
+
+      const p = waiter.waitForEvent(player, 'adaptation');
+      for (let i = 0; i < 3; i++) {
+        abrManager.switchCallback(abrManager.variants[abrManager.chooseIndex]);
+      }
+      await expectAsync(p).toBeRejected();  // Timeout
+    });
+  });  // describe('adaptation')
+
+  /** Regression test for Issue #2741 */
+  describe('unloading', () => {
+    drmIt('unloads properly after DRM error', async () => {
+      const drmSupport = await shaka.media.DrmEngine.probeSupport();
+      if (!drmSupport['com.widevine.alpha'] &&
+          !drmSupport['com.microsoft.playready']) {
+        pending('Skipping DRM error test, only runs on Widevine and PlayReady');
+      }
+
+      let unloadPromise = null;
+      const errorPromise = new Promise((resolve, reject) => {
+        onErrorSpy.and.callFake((event) => {
+          unloadPromise = player.unload();
+          onErrorSpy.and.callThrough();
+          resolve();
+        });
+      });
+
+      // Load an encrypted asset with the wrong license servers, so it errors.
+      const bogusUrl = 'http://foo/widevine';
+      player.configure('drm.servers', {
+        'com.widevine.alpha': bogusUrl,
+        'com.microsoft.playready': bogusUrl,
+      });
+      await player.load('test:sintel-enc_compiled');
+
+      await errorPromise;
+      expect(unloadPromise).not.toBeNull();
+      if (unloadPromise) {
+        await unloadPromise;
+      }
+    });
+  });  // describe('unloading')
 });
 
 // TODO(vaage): Try to group the stat tests together.
@@ -696,11 +1006,9 @@ describe('Player Load Path', () => {
   /** @type {!jasmine.Spy} */
   let stateIdleSpy;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     video = shaka.util.Dom.createVideoElement();
     document.body.appendChild(video);
-
-    await shaka.test.TestScheme.createManifests(shaka, '_compiled');
   });
 
   afterAll(() => {

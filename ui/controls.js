@@ -19,9 +19,8 @@
 goog.provide('shaka.ui.Controls');
 goog.provide('shaka.ui.ControlsPanel');
 
+goog.require('goog.asserts');
 goog.require('shaka.log');
-goog.require('shaka.ui.Constants');
-goog.require('shaka.ui.Enums');
 goog.require('shaka.ui.Locales');
 goog.require('shaka.ui.Localization');
 goog.require('shaka.ui.SeekBar');
@@ -50,9 +49,6 @@ shaka.ui.Controls = function(player, videoContainer, video, config) {
 
   /** @private {boolean} */
   this.enabled_ = true;
-
-  /** @private {boolean} */
-  this.overrideCssShowControls_ = false;
 
   /** @private {shaka.extern.UIConfiguration} */
   this.config_ = config;
@@ -89,13 +85,37 @@ shaka.ui.Controls = function(player, videoContainer, video, config) {
   this.settingsMenus_ = [];
 
   /**
+   * Individual controls which, when hovered or tab-focused, will force the
+   * controls to be shown.
+   * @private {!Array.<!Element>}
+   */
+  this.showOnHoverControls_ = [];
+
+  /** @private {boolean} */
+  this.recentMouseMovement_ = false;
+
+  /**
    * This timer is used to detect when the user has stopped moving the mouse
-   * and we should fade out the ui.
+   * and we should fade out the UI.
    *
    * @private {shaka.util.Timer}
    */
   this.mouseStillTimer_ = new shaka.util.Timer(() => {
     this.onMouseStill_();
+  });
+
+  /**
+   * This timer is used to delay the fading of the UI.
+   *
+   * @private {shaka.util.Timer}
+   */
+  this.fadeControlsTimer_ = new shaka.util.Timer(() => {
+    this.controlsContainer_.removeAttribute('shown');
+    // If there's an overflow menu open, keep it this way for a couple of
+    // seconds in case a user immediately initiates another mouse move to
+    // interact with the menus. If that didn't happen, go ahead and hide
+    // the menus.
+    this.hideSettingsMenusTimer_.tickAfter(/* seconds= */ 2);
   });
 
   /**
@@ -155,7 +175,7 @@ shaka.ui.Controls = function(player, videoContainer, video, config) {
    * The pressed keys set is used to record which keys are currently pressed
    * down, so we can know what keys are pressed at the same time.
    * Used by the focusInsideOverflowMenu_() function.
-   * @private {!Set.<number>}
+   * @private {!Set.<string>}
    */
   this.pressedKeys_ = new Set();
 
@@ -190,6 +210,11 @@ shaka.ui.Controls.prototype.destroy = async function() {
     this.mouseStillTimer_ = null;
   }
 
+  if (this.fadeControlsTimer_) {
+    this.fadeControlsTimer_.stop();
+    this.fadeControlsTimer_ = null;
+  }
+
   if (this.hideSettingsMenusTimer_) {
     this.hideSettingsMenusTimer_.stop();
     this.hideSettingsMenusTimer_ = null;
@@ -198,6 +223,11 @@ shaka.ui.Controls.prototype.destroy = async function() {
   if (this.timeAndSeekRangeTimer_) {
     this.timeAndSeekRangeTimer_.stop();
     this.timeAndSeekRangeTimer_ = null;
+  }
+
+  if (this.controlsContainer_) {
+    this.videoContainer_.removeChild(this.controlsContainer_);
+    this.controlsContainer_ = null;
   }
 
   if (this.castProxy_) {
@@ -229,7 +259,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.CastStatusChangedEvent
+ * @event shaka.ui.Controls.CastStatusChangedEvent
  * @description Fired upon receiving a 'caststatuschanged' event from
  *    the cast proxy.
  * @property {string} type
@@ -242,7 +272,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.SubMenuOpenEvent
+ * @event shaka.ui.Controls.SubMenuOpenEvent
  * @description Fired when one of the overflow submenus is opened
  *    (e. g. language/resolution/subtitle selection).
  * @property {string} type
@@ -252,7 +282,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.CaptionSelectionUpdatedEvent
+ * @event shaka.ui.Controls.CaptionSelectionUpdatedEvent
  * @description Fired when the captions/subtitles menu has finished updating.
  * @property {string} type
  *   'captionselectionupdated'
@@ -261,7 +291,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
  /**
- * @event shaka.Controls.ResolutionSelectionUpdatedEvent
+ * @event shaka.ui.Controls.ResolutionSelectionUpdatedEvent
  * @description Fired when the resolution menu has finished updating.
  * @property {string} type
  *   'resolutionselectionupdated'
@@ -270,7 +300,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.LanguageSelectionUpdatedEvent
+ * @event shaka.ui.Controls.LanguageSelectionUpdatedEvent
  * @description Fired when the audio language menu has finished updating.
  * @property {string} type
  *   'languageselectionupdated'
@@ -279,7 +309,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.ErrorEvent
+ * @event shaka.ui.Controls.ErrorEvent
  * @description Fired when something went wrong with the controls.
  * @property {string} type
  *   'error'
@@ -293,7 +323,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
 /**
- * @event shaka.Controls.TimeAndSeekRangeUpdatedEvent
+ * @event shaka.ui.Controls.TimeAndSeekRangeUpdatedEvent
  * @description Fired when the time and seek range elements have finished
  *    updating.
  * @property {string} type
@@ -303,7 +333,7 @@ shaka.ui.Controls.prototype.destroy = async function() {
 
 
  /**
- * @event shaka.Controls.UIUpdatedEvent
+ * @event shaka.ui.Controls.UIUpdatedEvent
  * @description Fired after a call to ui.configure() once the UI has finished
  *    updating.
  * @property {string} type
@@ -388,19 +418,6 @@ shaka.ui.Controls.prototype.configure = function(config) {
     this.eventManager_.listen(element, 'click', cb);
     this.eventManager_.listen(element, 'dblclick', cb);
   }
-
-  // Keep showing controls if one of those elements is hovered
-  const showControlsElements = this.videoContainer_.getElementsByClassName(
-      'shaka-show-controls-on-mouse-over');
-  for (const element of showControlsElements) {
-    this.eventManager_.listen(element, 'mouseover', () => {
-      this.overrideCssShowControls_ = true;
-    });
-
-    this.eventManager_.listen(element, 'mouseleave', () => {
-      this.overrideCssShowControls_ = false;
-    });
-  }
 };
 
 /**
@@ -421,8 +438,8 @@ shaka.ui.Controls.prototype.setEnabledShakaControls = function(enabled) {
 
     // If we're hiding native controls, make sure the video element itself is
     // not tab-navigable.  Our custom controls will still be tab-navigable.
-    this.video_.tabIndex = -1;
-    this.video_.controls = false;
+    this.localVideo_.tabIndex = -1;
+    this.localVideo_.controls = false;
   } else {
     shaka.ui.Utils.setDisplay(this.controlsContainer_, false);
     // Spinner lives outside of the main controls div
@@ -456,8 +473,8 @@ shaka.ui.Controls.prototype.setEnabledNativeControls = function(enabled) {
   // If we disable the native controls, we want to make sure that the video
   // element itself is not tab-navigable, so that the element is skipped over
   // when tabbing through the page.
-  this.video_.controls = enabled;
-  this.video_.tabIndex = enabled ? 0 : -1;
+  this.localVideo_.controls = enabled;
+  this.localVideo_.tabIndex = enabled ? 0 : -1;
 
   if (enabled) {
     this.setEnabledShakaControls(false);
@@ -497,7 +514,7 @@ shaka.ui.Controls.prototype.toggleFullScreen = async function() {
         detail: error,
       }));
     }
-    await this.videoContainer_.requestFullscreen();
+    await this.videoContainer_.requestFullscreen({navigationUI: 'hide'});
   }
 };
 
@@ -551,6 +568,8 @@ shaka.ui.Controls.prototype.getLocalPlayer = function() {
  * @export
  */
 shaka.ui.Controls.prototype.getControlsContainer = function() {
+  goog.asserts.assert(
+      this.controlsContainer_, 'No controls container after destruction!');
   return this.controlsContainer_;
 };
 
@@ -601,21 +620,6 @@ shaka.ui.Controls.prototype.setLastTouchEventTime = function(time) {
 
 
 /**
- * Display controls even if css says overwise.
- * Normally, controls opacity is controled by CSS, but there are
- * a few special cases where we want controls to be displayed no
- * matter what. For example, if the focus is on one of the settings
- * menus. This method is called when we want to signal an exception
- * to normal CSS opacity rules and keep the controls visible.
- *
- * @export
- */
-shaka.ui.Controls.prototype.overrideCssShowControls = function() {
-  this.overrideCssShowControls_ = true;
-};
-
-
-/**
  * @return {boolean}
  * @export
  */
@@ -638,7 +642,9 @@ shaka.ui.Controls.prototype.hideSettingsMenus = function() {
  */
 shaka.ui.Controls.prototype.createDOM_ = function() {
   this.videoContainer_.classList.add('shaka-video-container');
-  this.video_.classList.add('shaka-video');
+  this.localVideo_.classList.add('shaka-video');
+
+  this.addSkimContainer_();
 
   if (this.config_.addBigPlayButton) {
     this.addPlayButton_();
@@ -659,6 +665,10 @@ shaka.ui.Controls.prototype.createDOM_ = function() {
       menu.classList.add('shaka-low-position');
     }
   }
+
+  this.showOnHoverControls_ = Array.from(
+      this.videoContainer_.getElementsByClassName(
+          'shaka-show-controls-on-mouse-over'));
 };
 
 
@@ -666,7 +676,7 @@ shaka.ui.Controls.prototype.createDOM_ = function() {
  * @private
  */
 shaka.ui.Controls.prototype.addControlsContainer_ = function() {
-  /** @private {!HTMLElement} */
+  /** @private {HTMLElement} */
   this.controlsContainer_ = shaka.util.Dom.createHTMLElement('div');
   this.controlsContainer_.classList.add('shaka-controls-container');
   this.videoContainer_.appendChild(this.controlsContainer_);
@@ -692,6 +702,16 @@ shaka.ui.Controls.prototype.addPlayButton_ = function() {
   /** @private {shaka.ui.BigPlayButton} */
   this.playButton_ =
       new shaka.ui.BigPlayButton(playButtonContainer, this);
+};
+
+/** @private */
+shaka.ui.Controls.prototype.addSkimContainer_ = function() {
+  // This is the container that gets styled by CSS to have the
+  // black gradient skim at the end of the controls.
+  const skimContainer = shaka.util.Dom.createHTMLElement('div');
+  skimContainer.classList.add('shaka-skim-container');
+  skimContainer.classList.add('shaka-fade-out-on-mouse-out');
+  this.controlsContainer_.appendChild(skimContainer);
 };
 
 
@@ -750,7 +770,7 @@ shaka.ui.Controls.prototype.addControlsButtonPanel_ = function() {
   this.bottomControls_.appendChild(this.controlsButtonPanel_);
 
   // Overflow menus are supposed to hide once you click elsewhere
-  // on the video element. The code in onContainerClick_ ensures that.
+  // on the page. The click event listener on window ensures that.
   // However, clicks on controls panel don't propagate to the container,
   // so we have to explicitly hide the menus onclick here.
   this.eventManager_.listen(this.controlsButtonPanel_, 'click', () => {
@@ -780,11 +800,12 @@ shaka.ui.Controls.prototype.addControlsButtonPanel_ = function() {
 shaka.ui.Controls.prototype.onScreenRotation_ = function() {
   if (!this.video_ ||
       this.video_.readyState == 0 ||
-      this.castProxy_.isCasting()) { return; }
+      this.castProxy_.isCasting() ||
+      !this.config_.enableFullscreenOnRotation) { return; }
 
   if (screen.orientation.type.includes('landscape') &&
       !document.fullscreenElement) {
-    this.videoContainer_.requestFullscreen();
+    this.videoContainer_.requestFullscreen({navigationUI: 'hide'});
   } else if (screen.orientation.type.includes('portrait') &&
       document.fullscreenElement) {
     document.exitFullscreen();
@@ -809,10 +830,18 @@ shaka.ui.Controls.prototype.addEventListeners_ = function() {
 
   // Listen for key down events to detect tab and enable outline
   // for focused elements.
-  this.eventManager_.listen(window, 'keydown', this.onKeyDown_.bind(this));
+  this.eventManager_.listen(window, 'keydown', (e) => {
+    this.onKeyDown_(/** @type {!KeyboardEvent} */(e));
+  });
 
-  this.eventManager_.listen(
-      this.controlsContainer_, 'dblclick', () => this.toggleFullScreen());
+  // Listen for click events to dismiss the settings menus.
+  this.eventManager_.listen(window, 'click', () => this.hideSettingsMenus());
+
+  this.eventManager_.listen(this.controlsContainer_, 'dblclick', () => {
+    if (this.config_.doubleClickForFullscreen) {
+      this.toggleFullScreen();
+    }
+  });
 
   this.eventManager_.listen(this.video_,
       'play', this.onPlayStateChange_.bind(this));
@@ -838,8 +867,9 @@ shaka.ui.Controls.prototype.addEventListeners_ = function() {
         this.onCastStatusChange_(e);
       });
 
-  this.eventManager_.listen(this.videoContainer_,
-      'keyup', this.onKeyUp_.bind(this));
+  this.eventManager_.listen(this.videoContainer_, 'keyup', (e) => {
+    this.onKeyUp_(/** @type {!KeyboardEvent} */(e));
+  });
 
   if (screen.orientation) {
     this.eventManager_.listen(screen.orientation, 'change', () => {
@@ -861,6 +891,7 @@ shaka.ui.Controls.prototype.onMouseMove_ = function(event) {
   // Disable blue outline for focused elements for mouse navigation.
   if (event.type == 'mousemove') {
     this.controlsContainer_.classList.remove('shaka-keyboard-navigation');
+    this.computeOpacity();
   }
   if (event.type == 'touchstart' || event.type == 'touchmove' ||
       event.type == 'touchend' || event.type == 'keyup') {
@@ -880,6 +911,8 @@ shaka.ui.Controls.prototype.onMouseMove_ = function(event) {
   // Use the cursor specified in the CSS file.
   this.videoContainer_.style.cursor = '';
 
+  this.recentMouseMovement_ = true;
+
   // Make sure we are not about to hide the settings menus and then force them
   // open.
   this.hideSettingsMenusTimer_.stop();
@@ -890,7 +923,7 @@ shaka.ui.Controls.prototype.onMouseMove_ = function(event) {
     // seek bar will be updated mich more rapidly during mouse movement.  Do
     // this right before making it visible.
     this.updateTimeAndSeekRange_();
-    this.setControlsOpacity_(shaka.ui.Enums.Opacity.OPAQUE);
+    this.computeOpacity();
   }
 
   // Hide the cursor when the mouse stops moving.
@@ -930,13 +963,44 @@ shaka.ui.Controls.prototype.onMouseStill_ = function() {
   // Hide the cursor.  (NOTE: not supported on IE)
   this.videoContainer_.style.cursor = 'none';
 
-  // Keep showing the controls if video is paused or one of the control menus
-  // is hovered.
-  if ((this.video_.paused && !this.isSeeking_) ||
-       this.overrideCssShowControls_) {
-    this.setControlsOpacity_(shaka.ui.Enums.Opacity.OPAQUE);
+  this.recentMouseMovement_ = false;
+  this.computeOpacity();
+};
+
+
+/**
+ * @return {boolean} true if any relevant elements are hovered.
+ * @private
+ */
+shaka.ui.Controls.prototype.isHovered_ = function() {
+  return this.showOnHoverControls_.some((element) => {
+    return element.matches(':hover');
+  });
+};
+
+
+/**
+ * Recompute whether the controls should be shown or hidden.
+ */
+shaka.ui.Controls.prototype.computeOpacity = function() {
+  const videoIsPaused = this.video_.paused && !this.isSeeking_;
+  const keyboardNavigationMode = this.controlsContainer_.classList.contains(
+    'shaka-keyboard-navigation');
+
+  // Keep showing the controls if the video is paused, there has been recent
+  // mouse movement, we're in keyboard navigation, or one of a special class of
+  // elements is hovered.
+  if (videoIsPaused ||
+      this.recentMouseMovement_ ||
+      keyboardNavigationMode ||
+      this.isHovered_()) {
+    // Make sure the state is up-to-date before showing it.
+    this.updateTimeAndSeekRange_();
+
+    this.controlsContainer_.setAttribute('shown', 'true');
+    this.fadeControlsTimer_.stop();
   } else {
-    this.setControlsOpacity_(shaka.ui.Enums.Opacity.TRANSPARENT);
+    this.fadeControlsTimer_.tickAfter(/* seconds= */ this.config_.fadeDelay);
   }
 };
 
@@ -1024,17 +1088,17 @@ shaka.ui.Controls.prototype.onPlayStateChange_ = function() {
   if (this.video_.ended && !this.video_.paused) {
     this.video_.pause();
   }
+
+  this.computeOpacity();
 };
 
 
 /**
  * Support controls with keyboard inputs.
- * @param {!Event} event
+ * @param {!KeyboardEvent} event
  * @private
  */
 shaka.ui.Controls.prototype.onKeyUp_ = function(event) {
-  let key = event.key;
-
   let activeElement = document.activeElement;
   let isVolumeBar = activeElement && activeElement.classList ?
       activeElement.classList.contains('shaka-volume-bar') : false;
@@ -1046,10 +1110,13 @@ shaka.ui.Controls.prototype.onKeyUp_ = function(event) {
   }
 
   // When the key is released, remove it from the pressed keys set.
-  this.pressedKeys_.delete(event.keyCode);
+  this.pressedKeys_.delete(event.key);
 
+  if (!this.config_.enableKeyboardPlaybackControls) {
+    return;
+  }
 
-  switch (key) {
+  switch (event.key) {
     case 'ArrowLeft':
       // If it's not focused on the volume bar, move the seek time backward
       // for 5 sec. Otherwise, the volume will be adjusted automatically.
@@ -1104,11 +1171,8 @@ shaka.ui.Controls.prototype.onBufferingStateChange_ = function() {
 shaka.ui.Controls.prototype.isOpaque_ = function() {
   if (!this.enabled_) return false;
 
-  // TODO: refactor into a single property
-  // While you are casting, the UI is always opaque.
-  if (this.castProxy_ && this.castProxy_.isCasting()) return true;
-
-  return this.controlsContainer_.getAttribute('shown') != null;
+  return this.controlsContainer_.getAttribute('shown') != null ||
+      this.controlsContainer_.getAttribute('casting') != null;
 };
 
 
@@ -1157,34 +1221,34 @@ shaka.ui.Controls.prototype.updateTimeAndSeekRange_ = function() {
  * 3. When navigating on overflow settings menu by pressing Tab
  *    key or Shift+Tab keys keep the focus inside overflow menu.
  *
- * @param {!Event} event
+ * @param {!KeyboardEvent} event
  * @private
  */
 shaka.ui.Controls.prototype.onKeyDown_ = function(event) {
-  // Add the key code to the pressed keys set when it's pressed.
-  this.pressedKeys_.add(event.keyCode);
+  // Add the key to the pressed keys set when it's pressed.
+  this.pressedKeys_.add(event.key);
 
   const anySettingsMenusAreOpen = this.anySettingsMenusAreOpen();
 
-  if (event.keyCode == shaka.ui.Constants.KEYCODE_TAB) {
+  if (event.key == 'Tab') {
     // Enable blue outline for focused elements for keyboard
     // navigation.
     this.controlsContainer_.classList.add('shaka-keyboard-navigation');
+    this.computeOpacity();
     this.eventManager_.listen(window, 'mousedown',
                               this.onMouseDown_.bind(this));
   }
 
   // If escape key was pressed, close any open settings menus.
-  if (event.keyCode == shaka.ui.Constants.KEYCODE_ESCAPE) {
+  if (event.key == 'Escape') {
     this.hideSettingsMenusTimer_.tickNow();
   }
 
-  if (anySettingsMenusAreOpen &&
-        this.pressedKeys_.has(shaka.ui.Constants.KEYCODE_TAB)) {
-      // If Tab key or Shift+Tab keys are pressed when navigating through
-      // an overflow settings menu, keep the focus to loop inside the
-      // overflow menu.
-      this.keepFocusInMenu_(event);
+  if (anySettingsMenusAreOpen && this.pressedKeys_.has('Tab')) {
+    // If Tab key or Shift+Tab keys are pressed when navigating through
+    // an overflow settings menu, keep the focus to loop inside the
+    // overflow menu.
+    this.keepFocusInMenu_(event);
   }
 };
 
@@ -1227,7 +1291,7 @@ shaka.ui.Controls.prototype.keepFocusInMenu_ = function(event) {
     // previous element. If it's currently focused on the first shown child
     // element of the overflow menu, let the focus move to the last child
     // element of the menu.
-    if (this.pressedKeys_.has(shaka.ui.Constants.KEYCODE_SHIFT)) {
+    if (this.pressedKeys_.has('Shift')) {
       if (activeElement == firstShownChild) {
         event.preventDefault();
         lastShownChild.focus();
@@ -1250,25 +1314,6 @@ shaka.ui.Controls.prototype.keepFocusInMenu_ = function(event) {
  */
 shaka.ui.Controls.prototype.onMouseDown_ = function() {
   this.eventManager_.unlisten(window, 'mousedown');
-  this.eventManager_.listen(window, 'keydown', this.onKeyDown_.bind(this));
-};
-
-
-/**
- * @param {!shaka.ui.Enums.Opacity} opacity
- * @private
- */
-shaka.ui.Controls.prototype.setControlsOpacity_ = function(opacity) {
-  if (opacity == shaka.ui.Enums.Opacity.OPAQUE) {
-    this.controlsContainer_.setAttribute('shown', 'true');
-  } else {
-    this.controlsContainer_.removeAttribute('shown');
-    // If there's an overflow menu open, keep it this way for a couple of
-    // seconds in case a user immediately initiates another mouse move to
-    // interact with the menus. If that didn't happen, go ahead and hide
-    // the menus.
-    this.hideSettingsMenusTimer_.tickAfter(/* seconds= */ 2);
-  }
 };
 
 

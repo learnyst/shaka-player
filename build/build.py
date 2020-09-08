@@ -79,8 +79,6 @@ common_closure_defines = [
 ]
 
 debug_closure_opts = [
-    # Don't use a wrapper script in debug mode so all the internals are visible
-    # on the global object.
     '-O', 'SIMPLE',
 ]
 debug_closure_defines = [
@@ -225,7 +223,7 @@ class Build(object):
         build_path = self._get_build_file_path(line, root)
         if not build_path:
           return False
-        lines = open(build_path).readlines()
+        lines = shakaBuildHelpers.open_file(build_path).readlines()
         sub_root = os.path.dirname(build_path)
 
         # If this is a build file, then recurse and combine the builds.
@@ -276,13 +274,14 @@ class Build(object):
 
     build_name = 'shaka-player.' + name
     closure = compiler.ClosureCompiler(self.include, build_name)
-    generator = compiler.ExternGenerator(self.include, build_name)
+
+    # Don't pass node modules to the extern generator.
+    local_include = set([f for f in self.include if 'node_modules' not in f])
+    generator = compiler.ExternGenerator(local_include, build_name)
 
     closure_opts = common_closure_opts + common_closure_defines
     if is_debug:
       closure_opts += debug_closure_opts + debug_closure_defines
-      # The output wrapper is only used in the release build.
-      closure.add_wrapper = False
     else:
       closure_opts += release_closure_opts + release_closure_defines
 

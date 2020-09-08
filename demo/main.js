@@ -113,6 +113,10 @@ shakaDemo.Main = class {
                  'platform-and-browser-support-matrix';
     this.handleError_(severity, message, href);
 
+    const errorCloseButton =
+        document.getElementById('error-display-close-button');
+    errorCloseButton.style.display = 'none';
+
     // Update the componentHandler, to account for any new MDL elements added.
     componentHandler.upgradeDom();
 
@@ -149,13 +153,10 @@ shakaDemo.Main = class {
 
     if (navigator.serviceWorker) {
       console.debug('Registering service worker.');
-      try {
-        const registration =
-            await navigator.serviceWorker.register('service_worker.js');
-        console.debug('Service worker registered!', registration.scope);
-      } catch (error) {
-        console.error('Service worker registration failed!', error);
-      }
+      // NOTE: This can sometimes hang on iOS 12, so let's not wait for it to
+      // complete before setting up the app.  We don't even use the Promise
+      // result or react to the registration failure except to log it.
+      navigator.serviceWorker.register('service_worker.js');
     }
 
     // Optionally enter noinput mode. This has to happen before setting up the
@@ -166,6 +167,8 @@ shakaDemo.Main = class {
     window.addEventListener('hashchange', () => this.hashChanged_());
 
     await this.setupStorage_();
+
+    this.setupBugButton_();
 
     if (this.noInput_) {
       // Set the page to noInput mode, disabling the header and footer.
@@ -207,6 +210,71 @@ shakaDemo.Main = class {
     }
   }
 
+  /**
+   * @param {string} url
+   * @return {!Promise.<string>}
+   * @private
+   */
+  async loadText_(url) {
+    const netEngine = new shaka.net.NetworkingEngine();
+    const retryParams = shaka.net.NetworkingEngine.defaultRetryParameters();
+    const request = shaka.net.NetworkingEngine.makeRequest([url], retryParams);
+    const requestType = shaka.net.NetworkingEngine.RequestType.APP;
+    const operation = netEngine.request(requestType, request);
+    const response = await operation.promise;
+    const text = shaka.util.StringUtils.fromUTF8(response.data);
+    await netEngine.destroy();
+    return text;
+  }
+
+  /** @private */
+  async reportBug_() {
+    // Fetch the special bug template.
+    let text = await this.loadText_('autoTemplate.txt');
+
+    // Fill in what parts of the template we can.
+    const fillInTemplate = (replaceString, value) => {
+      text = text.replace(replaceString, value);
+    };
+    fillInTemplate('RE:player', shaka.Player.version);
+    fillInTemplate('RE:link', window.location.href);
+    fillInTemplate('RE:browser', navigator.userAgent);
+    if (this.selectedAsset &&
+        this.selectedAsset.source == shakaAssets.Source.CUSTOM) {
+      // This is a custom asset, so add a comment warning about custom assets.
+      const warning = await this.loadText_('customWarning.txt');
+      fillInTemplate('RE:customwarning', warning);
+    } else {
+      // No need for any warnings. So remove it (and the newline after it).
+      fillInTemplate('RE:customwarning\n', '');
+    }
+
+    // Navigate to the github issue opening interface, with the
+    // partially-filled template as a preset body.
+    let url = 'https://github.com/google/shaka-player/issues/new?';
+    url += 'body=' + encodeURIComponent(text);
+    // Open in another tab.
+    window.open(url, '_blank');
+  }
+
+  /** @private */
+  setupBugButton_() {
+    const bugButton = document.getElementById('bug-button');
+    bugButton.addEventListener('click', () => this.reportBug_());
+
+    // The button should be disabled when offline, as we can't report bugs in
+    // that state.
+    if (!navigator.onLine) {
+      bugButton.setAttribute('disabled', '');
+    }
+    window.addEventListener('online', () => {
+      bugButton.removeAttribute('disabled');
+    });
+    window.addEventListener('offline', () => {
+      bugButton.setAttribute('disabled', '');
+    });
+  }
+
   /** @private */
   setupPlayer_() {
     const video = /** @type {!HTMLVideoElement} */ (this.video_);
@@ -218,8 +286,8 @@ shakaDemo.Main = class {
       // sense to stop playing a video if you can't start playing other videos.
 
       // Register custom controls to the UI.
-      const factory = new shakaDemo.CloseButton.Factory();
-      shaka.ui.Controls.registerElement('close', factory);
+      const closeFactory = new shakaDemo.CloseButton.Factory();
+      shaka.ui.Controls.registerElement('close', closeFactory);
 
       // Configure UI.
       const uiConfig = ui.getConfiguration();
@@ -324,7 +392,11 @@ shakaDemo.Main = class {
 
     const storage = new shaka.offline.Storage();
 
-    // Set the progress callback;
+    // Configure the storage instance.
+    /**
+     * @param {string} identifier
+     * @return {?ShakaDemoAssetInfo}
+     */
     const getAssetWithIdentifier = (identifier) => {
       for (const asset of shakaAssets.testAssets) {
         if (this.getIdentifierFromAsset_(asset) == identifier) {
@@ -340,6 +412,10 @@ shakaDemo.Main = class {
       }
       return null;
     };
+    /**
+     * @param {shaka.extern.StoredContent} content
+     * @param {number} progress
+     */
     const progressCallback = (content, progress) => {
       const identifier = content.appMetadata['identifier'];
       const asset = getAssetWithIdentifier(identifier);
@@ -348,6 +424,7 @@ shakaDemo.Main = class {
         this.dispatchEventWithName_('shaka-main-offline-progress');
       }
     };
+    storage.configure(this.desiredConfig_);
     storage.configure('offline.progressCallback', progressCallback);
 
     return storage;
@@ -366,6 +443,10 @@ shakaDemo.Main = class {
       return;
     }
 
+    // If the list of stored content does not contain this asset, then make sure
+    // that the asset's |storedContent| value is null. Custom assets that were
+    // once stored might have that object serialized with their other data.
+    asset.storedContent = null;
     for (const storedContent of this.initialStoredList_) {
       const identifier = storedContent.appMetadata['identifier'];
       if (this.getIdentifierFromAsset_(asset) == identifier) {
@@ -625,10 +706,10 @@ shakaDemo.Main = class {
 
       // Construct a new asset.
       const asset = new ShakaDemoAssetInfo(
-        /* name= */ 'loaded asset',
-        /* iconUri= */ '',
-        /* manifestUri= */ manifest,
-        /* source= */ shakaAssets.Source.UNKNOWN);
+          /* name= */ 'loaded asset',
+          /* iconUri= */ '',
+          /* manifestUri= */ manifest,
+          /* source= */ shakaAssets.Source.CUSTOM);
       if ('license' in params) {
         let drmSystems = shakaDemo.Main.commonDrmSystems;
         if ('drmSystem' in params) {
@@ -670,6 +751,20 @@ shakaDemo.Main = class {
       };
       const config = this.player_.getConfiguration();
       shakaDemo.Utils.runThroughHashParams(readParam, config);
+      const advanced = this.getCurrentConfigValue('drm.advanced');
+      if (advanced) {
+        for (const drmSystem of shakaDemo.Main.commonDrmSystems) {
+          if (!advanced[drmSystem]) {
+            advanced[drmSystem] = shakaDemo.Config.emptyAdvancedConfiguration();
+          }
+          if ('videoRobustness' in params) {
+            advanced[drmSystem].videoRobustness = params['videoRobustness'];
+          }
+          if ('audioRobustness' in params) {
+            advanced[drmSystem].audioRobustness = params['audioRobustness'];
+          }
+        }
+      }
     }
     if ('lang' in params) {
       // Load the legacy 'lang' hash value.
@@ -885,8 +980,9 @@ shakaDemo.Main = class {
     if (storage) {
       storage.configure(assetConfig);
     } else {
-      // Re-apply the desired config, to remove previous asset configuration
-      // without removing previous user configuration.
+      // Remove all not-player-applied configurations, by resetting the
+      // configuration then re-applying the desired configuration.
+      this.player_.resetConfiguration();
       this.player_.configure(this.desiredConfig_);
       this.player_.configure(assetConfig);
       // This uses Player.configure so as to not change |this.desiredConfig_|.
@@ -992,9 +1088,7 @@ shakaDemo.Main = class {
           title: asset.name,
           artwork: [{src: asset.iconUri}],
         };
-        if (asset.source != shakaAssets.Source.UNKNOWN) {
-          metadata.artist = asset.source;
-        }
+        metadata.artist = asset.source;
         navigator.mediaSession.metadata = new MediaMetadata(metadata);
       }
     } catch (reason) {
@@ -1036,6 +1130,21 @@ shakaDemo.Main = class {
       };
       const config = this.player_.getConfiguration();
       shakaDemo.Utils.runThroughHashParams(setParam, config);
+      const advanced = this.getCurrentConfigValue('drm.advanced');
+      if (advanced) {
+        for (const drmSystem of shakaDemo.Main.commonDrmSystems) {
+          const advancedFor = advanced[drmSystem];
+          if (advancedFor) {
+            if (advancedFor.videoRobustness) {
+              params.push('videoRobustness=' + advancedFor.videoRobustness);
+            }
+            if (advancedFor.audioRobustness) {
+              params.push('audioRobustness=' + advancedFor.audioRobustness);
+            }
+            break;
+          }
+        }
+      }
     }
     if (!this.getCurrentConfigValue('abr.enabled')) {
       params.push('noadaptation');
@@ -1068,6 +1177,10 @@ shakaDemo.Main = class {
       if (button.nodeType == Node.ELEMENT_NODE &&
           button.classList.contains('mdl-button--accent')) {
         params.push('panel=' + button.textContent);
+        const hashValues = button.getAttribute('tab-hash');
+        if (hashValues) {
+          params.push('panelData=' + hashValues);
+        }
         break;
       }
     }
@@ -1150,7 +1263,10 @@ shakaDemo.Main = class {
    * setup process.
    * @param {string} containerName Used to determine the id of the button this
    *   is looking for.  Also used as the className of the container, for CSS.
-   * @return {!HTMLDivElement} The container for the tab.
+   * @return {{
+   *   container: !HTMLDivElement,
+   *   button: !HTMLButtonElement,
+   * }} The container for the tab, and the button element that activates it.
    */
   addNavButton(containerName) {
     const navButtons = document.getElementById('nav-button-container');
@@ -1162,7 +1278,13 @@ shakaDemo.Main = class {
     // Determine if the element is selected.
     const params = this.getParams_();
     let selected = params['panel'] == encodeURI(button.textContent);
-    if (!selected && !params['panel']) {
+    if (selected) {
+      // Re-apply any saved data from hash.
+      const hashValues = params['panelData'];
+      if (hashValues) {
+        button.setAttribute('tab-hash', hashValues);
+      }
+    } else if (!params['panel']) {
       // Check if it's selected by default.
       selected = button.getAttribute('defaultselected') != null;
     }
@@ -1202,7 +1324,10 @@ shakaDemo.Main = class {
       Promise.resolve().then(switchPage);
     }
 
-    return /** @type {!HTMLDivElement} */ (container);
+    return {
+      container: /** @type {!HTMLDivElement} */ (container),
+      button: /** @type {!HTMLButtonElement} */ (button),
+    };
   }
 
   /**

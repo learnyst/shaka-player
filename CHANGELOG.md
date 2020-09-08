@@ -1,3 +1,460 @@
+## 2.5.16 (2020-08-25)
+
+Bugfixes:
+  - Fix case sensitivity in KEYID format check in HLS
+    - https://github.com/google/shaka-player/issues/2789
+    - https://github.com/google/shaka-player/pull/2790
+  - Do not assume HDR for HEVC1.2 on Chromecast
+    - https://github.com/google/shaka-player/issues/2813
+  - Recognize "wvtt" codec in HLS WebVTT tracks
+    - https://github.com/google/shaka-player/pull/2778
+  - Fix case sensitivity for DRM content types
+    - https://github.com/google/shaka-player/issues/2799
+    - https://github.com/google/shaka-player/pull/2800
+  - PlayReady only has little-endian key IDs on Edge & IE
+    - https://github.com/google/shaka-player/pull/2801
+  - Fix UI translation of "live" in Chinese
+    - https://github.com/google/shaka-player/issues/2804
+
+Docs:
+  - Improve docs on platform support
+    - https://github.com/google/shaka-player/issues/2783
+    - https://github.com/google/shaka-player/pull/2787
+    - https://github.com/google/shaka-player/pull/2794
+    - https://github.com/google/shaka-player/pull/2795
+  - Add doc on Application-Level Redirects
+
+
+## 2.5.15 (2020-08-12)
+
+Bugfixes:
+  - Fix TTML style inheritance
+  - Fix ordering of cues on IE and Edge
+  - Fix src= playback on WebOS
+    - https://github.com/google/shaka-player/pull/2777
+  - Filter timeline regions by seek range
+    - https://github.com/google/shaka-player/issues/2716
+  - Don't send duplicate license requests
+    - https://github.com/google/shaka-player/issues/2754
+  - Fix data URI parsing when charset present
+  - Fix rendering of TTML nested cues and spacers
+    - https://github.com/google/shaka-player/issues/2760
+
+Docs:
+  - Correct very outdated docs on test.py
+
+
+## 2.5.14 (2020-07-28)
+
+Bugfixes:
+  - Fix missing build/types/core in npm packages
+    - https://github.com/google/shaka-player/issues/2752
+  - Work around stalling playback on Tizen 3
+    - https://github.com/google/shaka-player/issues/2620
+  - Fix hang while shutting down Widevine DRM sessions
+    - https://github.com/google/shaka-player/issues/2741
+  - Fix initial bandwidth estimate on Tizen
+  - Fix src= playback on Tizen 3
+  - Work around less 3.12.0 bug
+  - Append license for language-mapping-list to output
+
+Docs:
+  - Update tutorial for seek bar color changes
+    - https://github.com/google/shaka-player/issues/2708
+  - Add FAQ entry for native HLS playback in Safari
+  - Update tutorials and docs to async/await syntax
+    - https://github.com/google/shaka-player/issues/2544
+    - https://github.com/google/shaka-player/pull/2693
+  - Update tutorials and docs to use modern variable syntax (const/let)
+    - https://github.com/google/shaka-player/issues/2544
+    - https://github.com/google/shaka-player/pull/2692
+
+
+## 2.5.13 (2020-06-11)
+
+Bugfixes:
+  - Fix background color of nested cues
+    - https://github.com/google/shaka-player/issues/2623
+    - https://github.com/google/shaka-player/pull/2624
+  - Fix seeking from Google Home app while casting
+    - https://github.com/google/shaka-player/issues/2606
+  - Fix cancelation of pending network requests on load() and destroy()
+    - https://github.com/google/shaka-player/issues/2619
+  - Fix pixelAspectRatio extraction from DASH
+    - https://github.com/google/shaka-player/pull/2614
+  - Fix nested TTML captions with time offset
+    - https://github.com/google/shaka-player/issues/2601
+    - https://github.com/google/shaka-player/pull/2602
+  - Set explicit default font size for UI icons
+    - https://github.com/google/shaka-player/issues/2633
+  - Correct license headers in compiled output and generated externs
+    - https://github.com/google/shaka-player/issues/2638
+
+
+## 2.5.12 (2020-05-29)
+
+Bugfixes:
+  - Don't preload data on iOS
+    - https://github.com/google/shaka-player/issues/2483
+  - Make the controls background gradient proportional
+  - Work around IE 11 bug in text region positioning
+    - https://github.com/google/shaka-player/issues/2584
+  - Fix PlayReady key ID endianness for TiVo
+    - https://github.com/google/shaka-player/pull/2582
+  - Fix shaka.log in debug builds
+    - https://github.com/google/shaka-player/issues/2565
+  - Add support for null TS packets in HLS
+    - https://github.com/google/shaka-player/issues/2546
+  - Fix live seek bar on touch screens
+    - https://github.com/google/shaka-player/issues/2558
+  - Fix text track change after enabling text display
+    - https://github.com/google/shaka-player/issues/2553
+  - Fix SegmentTimeline with t attribute missing.
+    - https://github.com/google/shaka-player/issues/2590
+  - Fix various text positioning bugs
+    - https://github.com/google/shaka-player/issues/2524
+  - Allow OPUS on Tizen 5 or higher
+    - https://github.com/google/shaka-player/pull/2564
+  - Fix CEA caption extraction for b-frame content
+    - https://github.com/google/shaka-player/issues/2395
+  - Fix module wrapper to prevent conflicting exports
+    - https://github.com/google/shaka-player/issues/2549
+
+New Features:
+  - Add option to customize the polling of expiration time
+    - https://github.com/google/shaka-player/issues/2252
+    - https://github.com/google/shaka-player/pull/2579
+  - Add new option manifest.hls.useFullSegmentsForStartTime
+    - https://github.com/google/shaka-player/issues/2556
+    - https://github.com/google/shaka-player/pull/2575
+
+
+## 2.5.11 (2020-05-05)
+
+New Features:
+  - Add role information to text and audio tracks in src= mode
+    - https://github.com/google/shaka-player/pull/2543
+  - Parse HLS CHARACTERISTICS attribute and populate track roles
+    - https://github.com/google/shaka-player/pull/2534
+  - Recognize new CMAF file extensions cmfv, cmfa, cmft in HLS
+    - https://github.com/google/shaka-player/pull/2473
+  - Add configuration to enable/disable fullscreen-on-rotate
+    - https://github.com/google/shaka-player/issues/2494
+  - Add configuration to enable keyboard playback controls
+    - https://github.com/google/shaka-player/issues/2489
+  - Dismiss UI overflow menus on window click
+  - Add non-standard DASH PlayReady UUID
+    - https://github.com/google/shaka-player/pull/2474
+
+Bugfixes:
+  - Fix FairPlay event handling
+    - https://github.com/google/shaka-player/issues/2214
+  - Fix load() Promise hang on iOS
+    - https://github.com/google/shaka-player/issues/2483
+  - Fix language normalization with native HLS
+    - https://github.com/google/shaka-player/issues/2480
+  - Fix display of duplicate cues
+    - https://github.com/google/shaka-player/issues/2497
+  - Fix TTML position parsing
+    - https://github.com/google/shaka-player/issues/2477
+    - https://github.com/google/shaka-player/pull/2493
+  - Fix display of line-positioned subtitles
+    - https://github.com/google/shaka-player/issues/2524
+  - Update to mux.js 5.5.4 to fix closed caption parsing bug
+    - https://github.com/videojs/mux.js/pull/330
+    - https://github.com/videojs/mux.js/pull/333
+  - Fix language and role preferences in src= mode
+    - https://github.com/google/shaka-player/pull/2535
+    - https://github.com/google/shaka-player/pull/2506
+  - Fix extra text track in src= mode
+    - https://github.com/google/shaka-player/issues/2516
+  - Fix Safari-prefixed fullscreen APIs
+    - https://github.com/google/shaka-player/issues/2528
+  - Fix display of nested cues with native text display
+    - https://github.com/google/shaka-player/issues/2263
+  - Fix getPlayheadTimeAsDate while loading/buffering
+  - Recover from timed-out Cast connection
+    - https://github.com/google/shaka-player/issues/2446
+  - Fix DRM exceptions on WebOS TVs
+    - https://github.com/google/shaka-player/issues/2512
+    - https://github.com/google/shaka-player/pull/2513
+  - Fix frameRate restrictions
+  - Filter out metadata text tracks in Player tracks API
+    - https://github.com/google/shaka-player/pull/2519
+  - Fix PlayRateController leak
+  - Fix buffer check in StallDetector
+    - https://github.com/google/shaka-player/issues/1809
+  - Fix offline storage picking high-bandwidth codecs
+    - https://github.com/google/shaka-player/issues/2390
+  - Fix nested TTML cues with non-ASCII characters
+    - https://github.com/google/shaka-player/issues/2478
+  - Fix UI updates when enabling captions
+    - https://github.com/google/shaka-player/issues/2484
+  - Fix ratechange events w/ src= playback
+    - https://github.com/google/shaka-player/issues/2488
+  - Fix serialization of Error objects over Cast
+  - Fix missing EME polyfill in Cast receiver
+  - Use the module wrapper in debug builds
+    - https://github.com/google/shaka-player/issues/2465
+
+Docs:
+  - Fix broken docs for UI control events
+    - https://github.com/google/shaka-player/issues/2385
+  - Add FAQ entry about minBufferTime
+    - https://github.com/google/shaka-player/issues/2000
+
+Demo App:
+  - Push demo app footer to the bottom of the page
+
+
+## 2.5.10 (2020-03-24)
+
+New Features:
+  - Added 'doubleClickForFullscreen' config to UI
+    - https://github.com/google/shaka-player/issues/2459
+  - Add 'loaded' event
+    - https://github.com/google/shaka-player/pull/2441
+  - Update prerequisites script w/ new nodejs versions
+  - Export default text parser plugins
+    - https://github.com/google/shaka-player/issues/2428
+  - Add config to show/hide unbuffered range at seek bar start
+    - https://github.com/google/shaka-player/issues/2424
+  - Approximate segment size based on bandwidth when deciding to abort a request
+    - https://github.com/google/shaka-player/pull/2288
+  - Always log config errors
+  - Make 'offline.trackSelectionCallback' async to allow the app to prompt the
+    user or do other async checks
+    - https://github.com/google/shaka-player/pull/2387
+  - Disable video when the media element is AUDIO
+    - https://github.com/google/shaka-player/issues/2246
+    - https://github.com/google/shaka-player/pull/2371
+
+Bugfixes:
+  - Fix DRM-related issues on Tizen
+    - https://github.com/google/shaka-player/issues/813
+    - https://github.com/google/shaka-player/issues/2447
+    - https://github.com/google/shaka-player/issues/2448
+    - https://github.com/google/shaka-player/pull/2449
+  - Fix exceptions with very large manifests on XBox One and possibly other
+    consumer electronics platforms
+    - https://github.com/google/shaka-player/issues/2433
+  - Fix UI exception joining existing Cast session
+    - https://github.com/google/shaka-player/issues/2451
+  - Fix UTCTiming when autoCorrectDrift is off
+    - https://github.com/google/shaka-player/issues/2411
+    - https://github.com/google/shaka-player/pull/2412
+  - Fix EME polyfill exceptions on Edge
+    - https://github.com/google/shaka-player/issues/2413
+  - Fix offline storage with some Widevine and PlayReady content
+    - https://github.com/google/shaka-player/pull/2400
+  - Don't fire 'adaptation' event when not switching
+    - https://github.com/google/shaka-player/issues/2392
+  - Fix rare exception in isTextTrackVisible()
+    - https://github.com/google/shaka-player/issues/2399
+  - Fix bogus warnings about argument count in configs
+  - Fix duplicate DB objects when storing offline content
+    - https://github.com/google/shaka-player/issues/2389
+  - Fix MIME type case sensitivity in HLS parser
+  - Fix changing UI Cast app ID to empty string
+  - Fix case sensitivity in TTML MIME types
+    - https://github.com/google/shaka-player/issues/2378
+    - https://github.com/google/shaka-player/pull/2381
+  - Fix exceptions for Video Futur platform
+    - https://github.com/google/shaka-player/issues/2189
+    - https://github.com/google/shaka-player/pull/2368
+  - Fix captions display alignment
+    - https://github.com/google/shaka-player/issues/2334
+    - https://github.com/google/shaka-player/issues/2157
+  - Fix Cast errors in compiled mode
+    - https://github.com/google/shaka-player/issues/2130
+
+Docs:
+  - Improve ClearKey examples
+    - https://github.com/google/shaka-player/issues/2434
+    - https://github.com/google/shaka-player/pull/2439
+  - Fix truncated UI tutorial
+    - https://github.com/google/shaka-player/issues/2410
+  - Update offline.md
+    - https://github.com/google/shaka-player/pull/2404
+  - Add additional links in error code reference
+
+Demo App:
+  - Several service worker improvements and fixes
+  - Load pwacompat through npm
+  - Replace Live search boolean with a drop-down
+  - Renamed the "search" tab to "all content"
+  - Add search filters to the URL
+  - Work around Material Icons font bug
+  - Work around MDL button bug in iOS 13
+    - https://github.com/google/shaka-player/issues/2376
+
+
+## 2.5.9 (2020-02-04)
+
+Bugfixes:
+  - Fix PiP polyfill for iOS
+    - https://github.com/google/shaka-player/issues/2199
+  - Ban iOS < 12
+    - https://github.com/google/shaka-player/issues/1920
+  - Work around service worker registration hang on iOS
+  - Fix display of selected language in UI
+    - https://github.com/google/shaka-player/issues/2353
+  - Fix race condition on HLS parser shutdown
+    - https://github.com/google/shaka-player/issues/2138
+  - Fix StringUtils on Xbox One
+    - https://github.com/google/shaka-player/issues/2186
+  - Fix selecting audio track by role when video tracks contain the same role
+    - https://github.com/google/shaka-player/issues/2346
+  - Fix skipping of raw format streams in HLS
+  - Fix iPad 13+ detection
+    - https://github.com/google/shaka-player/issues/2360
+  - Fix exception thrown for Chrome & Firefox on iOS
+
+Docs:
+  - Fix typo in fairplay tutorial
+    - https://github.com/google/shaka-player/issues/2344
+
+
+## 2.5.8 (2020-01-16)
+
+Bugfixes:
+  - Recognize and reject raw AAC in HLS
+    - https://github.com/google/shaka-player/issues/1083
+    - https://github.com/google/shaka-player/issues/2337
+  - Fix fullscreen on Android
+    - https://github.com/google/shaka-player/issues/2324
+    - https://github.com/google/shaka-player/pull/2325
+  - Fix start time support in src= mode
+    - https://github.com/google/shaka-player/issues/2267
+    - https://github.com/google/shaka-player/pull/2271
+  - Add missing events to CastProxy Player
+    - https://github.com/google/shaka-player/issues/2318
+  - Fix cast receiver UI update
+    - https://github.com/google/shaka-player/issues/2314
+
+New Features:
+  - Add corruptedFrames to stats
+    - https://github.com/google/shaka-player/pull/2328
+  - Add framerate restriction to the config
+    - https://github.com/google/shaka-player/issues/2068
+    - https://github.com/google/shaka-player/pull/2332
+  - Add option to ignore empty AdaptationSets in DASH
+    - https://github.com/google/shaka-player/issues/2023
+    - https://github.com/google/shaka-player/pull/2330
+  - Add licenseTime to stats
+    - https://github.com/google/shaka-player/pull/2297
+  - Add pixelAspectRatio property from DASH
+    - https://github.com/google/shaka-player/pull/2294
+  - Add AirPlay support with native HLS and FairPlay
+    - https://github.com/google/shaka-player/issues/2177
+    - https://github.com/google/shaka-player/pull/2257
+  - Add option to show text/audio roles in UI
+    - https://github.com/google/shaka-player/issues/2307
+  - Add "fadeDelay" option to delay fading UI controls
+
+Demo App:
+  - Update asset list and metadata
+
+
+## 2.5.7 (2019-12-18)
+
+New Features:
+  - Add audioSamplingRate property
+    - https://github.com/google/shaka-player/pull/2290
+  - Ignore DASH image tracks
+    - https://github.com/google/shaka-player/pull/2276
+  - Add AV1 check and more file extensions for src mode
+    - https://github.com/google/shaka-player/pull/2280
+  - Allow removing text from manifests
+    - https://github.com/google/shaka-player/pull/2278
+  - Allow ignoreSuggestedPresentationDelay in DASH
+    - https://github.com/google/shaka-player/pull/2260
+  - Allow removing video from manifests
+    - https://github.com/google/shaka-player/pull/2259
+  - Add a polyfill for EME encryption scheme queries
+  - Add support for ttml regions
+    - https://github.com/google/shaka-player/issues/2191
+  - Add a method to select variants by label
+    - https://github.com/google/shaka-player/issues/924
+
+Bugfixes:
+  - Fix shaka.polyfill missing in externs
+  - Fix width of overflow menu with wide content
+    - https://github.com/google/shaka-player/issues/2249
+  - Disable indexedDB support if an error is thrown
+    - https://github.com/google/shaka-player/pull/2236
+  - Fix setting robustness settings in DRM config
+    - https://github.com/google/shaka-player/issues/2211
+
+
+## 2.5.6 (2019-11-06)
+
+Bugfixes:
+  - Fix storing content with delayLicenseRequestUntilPlayed
+    - https://github.com/google/shaka-player/issues/2218
+  - Fix check for captions in appendBuffer
+    - https://github.com/google/shaka-player/issues/2187
+  - Allow 'rebufferingGoal' to change after startup
+    - https://github.com/google/shaka-player/issues/2217
+  - Fix default encoding when reading files
+    - https://github.com/google/shaka-player/issues/2206
+  - Throw for invalid TTML
+    - https://github.com/google/shaka-player/issues/2157
+  - Fix FairPlay default initDataTransform
+    - https://github.com/google/shaka-player/issues/2136
+  - Fix live seekbar on Android
+    - https://github.com/google/shaka-player/issues/2169
+  - Fix undefined value in HLS request filters
+    - https://github.com/google/shaka-player/issues/2156
+  - Fix Period transitions with embedded captions
+    - https://github.com/google/shaka-player/issues/2076
+  - Throw error for clear-key content with src=
+    - https://github.com/google/shaka-player/issues/2139
+  - Fix support for empty TTML data
+    - https://github.com/google/shaka-player/pull/1960
+  - Fix multi-Period handling of key statuses
+    - https://github.com/google/shaka-player/issues/2135
+  - Fix stall at end with src=
+    - https://github.com/google/shaka-player/issues/2117
+  - Fix ttml background image support
+    - https://github.com/google/shaka-player/pull/2034
+
+New Features:
+  - Add config to use MSE playback on Safari
+    - https://github.com/google/shaka-player/issues/2116
+  - Support storing protected content without init data in manifest
+    - https://github.com/google/shaka-player/issues/1531
+    - https://github.com/google/shaka-player/pull/2164
+  - Allow disable audio/video in manifest parsers
+    - https://github.com/google/shaka-player/pull/2196
+  - Enhance ttml rendering
+    - https://github.com/google/shaka-player/pull/1962
+  - Include event ID in DASH Event checks
+    - https://github.com/google/shaka-player/issues/2077
+    - https://github.com/google/shaka-player/pull/2175
+  - Add support for Label element in DASH
+    - https://github.com/google/shaka-player/issues/2178
+    - https://github.com/google/shaka-player/pull/2197
+  - Treat URL schemes as case-insensitive
+    - https://github.com/google/shaka-player/issues/2173
+  - Forward change event from src= playback
+    - https://github.com/google/shaka-player/pull/2134
+  - Export getMaxSegmentDuration() on presentationTimeline
+    - https://github.com/google/shaka-player/issues/2124
+  - Ignore MIME parameters in Content-Type check
+    - https://github.com/google/shaka-player/issues/1946
+    - https://github.com/google/shaka-player/pull/2215
+  - Make seek & volume bar colors configurable
+    - https://github.com/google/shaka-player/issues/2203
+
+Demo App:
+  - Improve mobile Safari PWA support in demo
+    - https://github.com/google/shaka-player/issues/2143
+  - Added tooltips to the search filters on the demo
+  - Added "report bug" button to demo
+
+
+
 ## 2.5.5 (2019-08-23)
 
 New Features:
@@ -521,11 +978,11 @@ New Features:
 
 Deprecated:
   - Passing a ManifestParser factory to Player.load is deprecated and support
-    will be removed in v2.6. Instead, please register any custom parsers with a
+    will be removed in v3.0. Instead, please register any custom parsers with a
     MIME type, and pass a MIME type instead.  MIME types can also be used to
     force the selection of any built-in manifest parsers.
   - The |manifestUri| method on Player was changed to |assetUri|. The old method
-    is deprecated and will be removed in v2.6.
+    is deprecated and will be removed in v3.0.
 
 
 ## 2.4.4 (2018-08-23)

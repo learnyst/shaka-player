@@ -58,6 +58,20 @@ shaka.ui.Overlay = function(player, videoContainer, video) {
   // Run the initial setup so that no configure() call is required for default
   // settings.
   this.configure({});
+
+  // If the browser's native controls are disabled, use UI TextDisplayer.
+  // Arrow functions cannot be used with "new", so the factory must use
+  // a "function" function.
+  if (!video.controls) {
+    // eslint-disable-next-line no-restricted-syntax
+    const textDisplayer = function() {
+      return new shaka.ui.TextDisplayer(video, videoContainer);
+    };
+    player.configure('textDisplayFactory', textDisplayer);
+  }
+
+  videoContainer['ui'] = this;
+  video['ui'] = this;
 };
 
 
@@ -66,11 +80,15 @@ shaka.ui.Overlay = function(player, videoContainer, video) {
  * @export
  */
 shaka.ui.Overlay.prototype.destroy = async function() {
-  await this.controls_.destroy();
-  this.controls_ = null;
+  if (this.controls_) {
+    await this.controls_.destroy();
+    this.controls_ = null;
+  }
 
-  await this.player_.destroy();
-  this.player_ = null;
+  if (this.player_) {
+    await this.player_.destroy();
+    this.player_ = null;
+  }
 };
 
 
@@ -196,6 +214,21 @@ shaka.ui.Overlay.prototype.defaultConfig_ = function() {
     addBigPlayButton: true,
     castReceiverAppId: '',
     clearBufferOnQualityChange: true,
+    showUnbufferedStart: true,
+    seekBarColors: {
+      base: 'rgba(255, 255, 255, 0.3)',
+      buffered: 'rgba(255, 255, 255, 0.54)',
+      played: 'rgb(255, 255, 255)',
+    },
+    volumeBarColors: {
+      base: 'rgba(255, 255, 255, 0.54)',
+      level: 'rgb(255, 255, 255)',
+    },
+    trackLabelFormat: shaka.ui.TrackLabelFormat.LANGUAGE,
+    fadeDelay: 0,
+    doubleClickForFullscreen: true,
+    enableKeyboardPlaybackControls: true,
+    enableFullscreenOnRotation: true,
   };
 };
 
@@ -203,7 +236,7 @@ shaka.ui.Overlay.prototype.defaultConfig_ = function() {
 /**
  * @private
  */
-shaka.ui.Overlay.scanPageForShakaElements_ = function() {
+shaka.ui.Overlay.scanPageForShakaElements_ = async function() {
   // Install built-in polyfills to patch browser incompatibilities.
   shaka.polyfill.installAll();
   // Check to see if the browser supports the basic APIs Shaka needs.
@@ -249,23 +282,7 @@ shaka.ui.Overlay.scanPageForShakaElements_ = function() {
       videoParent.replaceChild(container, video);
       container.appendChild(video);
 
-      let castAppId = '';
-
-      // If cast receiver application id was provided, pass it to the
-      // UI constructor.
-      if (video['dataset'] && video['dataset']['shakaPlayerCastReceiverId']) {
-        castAppId = video['dataset']['shakaPlayerCastReceiverId'];
-      }
-
-      const ui = shaka.ui.Overlay.createUI_(
-          shaka.util.Dom.asHTMLElement(container),
-          shaka.util.Dom.asHTMLMediaElement(video));
-
-      ui.configure({castReceiverAppId: castAppId});
-
-      if (shaka.util.Dom.asHTMLMediaElement(video).controls) {
-        ui.getControls().setEnabledNativeControls(true);
-      }
+        shaka.ui.Overlay.setupUIandAutoLoad_(container, video);
     }
   } else {
     for (let i = 0; i < containers.length; i++) {
@@ -278,15 +295,6 @@ shaka.ui.Overlay.scanPageForShakaElements_ = function() {
       goog.asserts.assert(container.tagName.toLowerCase() == 'div',
         'Container should be a div!');
 
-      let castAppId = '';
-
-      // Cast receiver id can be specified on either container or video.
-      // It should not be provided on both. If it was, we will use the last
-      // one we saw.
-      if (container['dataset'] &&
-          container['dataset']['shakaPlayerCastReceiverId']) {
-        castAppId = container['dataset']['shakaPlayerCastReceiverId'];
-      }
 
       let video = null;
       for (let j = 0; j < videos.length; j++) {
@@ -304,14 +312,8 @@ shaka.ui.Overlay.scanPageForShakaElements_ = function() {
         container.appendChild(video);
       }
 
-      if (video['dataset'] && video['dataset']['shakaPlayerCastReceiverId']) {
-        castAppId = video['dataset']['shakaPlayerCastReceiverId'];
-      }
-      const ui = shaka.ui.Overlay.createUI_(
-          shaka.util.Dom.asHTMLElement(container),
-          shaka.util.Dom.asHTMLMediaElement(video));
-
-      ui.configure({castReceiverAppId: castAppId});
+      // eslint-disable-next-line no-await-in-loop
+      await shaka.ui.Overlay.setupUIandAutoLoad_(container, video);
     }
   }
 
@@ -337,29 +339,78 @@ shaka.ui.Overlay.dispatchLoadedEvent_ = function(eventName) {
 
 
 /**
- * @param {!HTMLElement} container
- * @param {!HTMLMediaElement} video
- * @return {!shaka.ui.Overlay}
+ * @param {!Element} container
+ * @param {!Element} video
  * @private
  */
-shaka.ui.Overlay.createUI_ = function(container, video) {
-  const player = new shaka.Player(video);
-  const ui = new shaka.ui.Overlay(player, container, video);
+shaka.ui.Overlay.setupUIandAutoLoad_ = async function(container, video) {
+  // Create the UI
+    const player = new shaka.Player(
+        shaka.util.Dom.asHTMLMediaElement(video));
+    const ui = new shaka.ui.Overlay(player,
+      shaka.util.Dom.asHTMLElement(container),
+      shaka.util.Dom.asHTMLMediaElement(video));
 
-  // If the browser's native controls are disabled, use UI TextDisplayer. Right
-  // now because the factory must be a constructor and () => {} can't be a
-  // constructor.
-  if (!video.controls) {
-    player.configure(
-        'textDisplayFactory',
-        function() { return new shaka.ui.TextDisplayer(video, container); });
+  // Get and configure cast app id.
+  let castAppId = '';
+
+  // Cast receiver id can be specified on either container or video.
+  // It should not be provided on both. If it was, we will use the last
+  // one we saw.
+  if (container['dataset'] &&
+      container['dataset']['shakaPlayerCastReceiverId']) {
+    castAppId = container['dataset']['shakaPlayerCastReceiverId'];
+  } else if (video['dataset'] &&
+             video['dataset']['shakaPlayerCastReceiverId']) {
+    castAppId = video['dataset']['shakaPlayerCastReceiverId'];
   }
 
-  container['ui'] = ui;
-  video['ui'] = ui;
-  return ui;
+  if (castAppId.length) {
+    ui.configure({castReceiverAppId: castAppId});
+  }
+
+  if (shaka.util.Dom.asHTMLMediaElement(video).controls) {
+    ui.getControls().setEnabledNativeControls(true);
+  }
+
+  // Get the source and load it
+  // Source can be specified either on the video element:
+  //  <video src='foo.m2u8'></video>
+  // or as a separate element inside the video element:
+  //  <video>
+  //    <source src='foo.m2u8'/>
+  //  </video>
+  // It should not be specified on both.
+  const src = video.getAttribute('src');
+  if (src) {
+    const sourceElem = document.createElement('source');
+    sourceElem.setAttribute('src', src);
+    video.appendChild(sourceElem);
+    video.removeAttribute('src');
+  }
+
+  for (const elem of video.querySelectorAll('source')) {
+    try { // eslint-disable-next-line no-await-in-loop
+      await ui.getControls().getPlayer().load(elem.getAttribute('src'));
+      break;
+    } catch (e) {
+      shaka.log.error('Error auto-loading asset', e);
+    }
+  }
 };
 
+/**
+ * Describes what information should show up in labels for selecting audio
+ * variants and text tracks.
+ *
+ * @enum {number}
+ * @export
+ */
+shaka.ui.TrackLabelFormat = {
+  'LANGUAGE': 0,
+  'ROLE': 1,
+  'LANGUAGE_ROLE': 2,
+};
 
 if (document.readyState == 'complete') {
   // Don't fire this event synchronously.  In a compiled bundle, the "shaka"

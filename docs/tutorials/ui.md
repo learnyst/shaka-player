@@ -5,6 +5,7 @@ localized UI. It is an alternate bundle from the base
 Shaka Player library, that adds additional UI-specific classes and a streamlined
 declarative style of setup.
 
+
 #### Setting up the UI library
 
 Setting up a project with the UI library is even easier than setting one up without.
@@ -41,7 +42,7 @@ Set up controls with HTML data attributes:
 ```js
 // myapp.js
 
-var manifestUri =
+const manifestUri =
     'https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd';
 
 async function init() {
@@ -91,8 +92,8 @@ document.addEventListener('shaka-ui-loaded', init);
 // Listen to the custom shaka-ui-load-failed event, in case Shaka Player fails
 // to load (e.g. due to lack of browser support).
 document.addEventListener('shaka-ui-load-failed', initFailed);
-
 ```
+
 
 #### Enabling Chromecast support
 
@@ -107,7 +108,6 @@ set up a listener for the 'caststatuschanged' events.
     <div data-shaka-player-container style="max-width:40em"
          data-shaka-player-cast-receiver-id="A15A181D">
     </div>
-
 ```
 
 With the UI library set up this way, it will provide a button for casting to a
@@ -123,10 +123,53 @@ Next, let's add a listener to the 'caststatuschanged' event in myapp.js:
     // Handle cast status change
     console.log('The new cast status is: ' + newCastStatus);
   }
-
 ```
 
-<!-- TODO: Also mention the download button, once we add it. -->
+#### Providing source(s) for auto load.
+
+It's also possible to provide the `src` attribute on the `<video>` element
+or a `<source>` tag inside it to enable auto loading of the specified content.
+
+```html
+    <div data-shaka-player-container style="max-width:40em"
+         data-shaka-player-cast-receiver-id="7B25EC44">
+      <!-- The manifest url in the src attribute will be automatically loaded -->
+      <video autoplay data-shaka-player id="video" style="width:100%;height:100%"
+       src="https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"></video>
+    </div>
+```
+
+or
+
+```html
+    <div data-shaka-player-container style="max-width:40em"
+         data-shaka-player-cast-receiver-id="7B25EC44">
+      <video autoplay data-shaka-player id="video" style="width:100%;height:100%">
+        <!-- The manifest url in the src attribute will be auto loaded -->
+       <source src="https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"/>
+      </video>
+    </div>
+```
+
+Use several `<source>` tags to provide backup manifest urls in case the `load()`
+call to the first one fails.
+
+```html
+    <div data-shaka-player-container style="max-width:40em"
+         data-shaka-player-cast-receiver-id="7B25EC44">
+      <video autoplay data-shaka-player id="video" style="width:100%;height:100%">
+        <!-- Try this first -->
+        <source src="https://storage.googleapis.com/shaka-demo-assets/angel-one/dash.mpd"/>
+        <!-- Try this if the first one has failed -->
+        <source src="https://storage.googleapis.com/shaka-demo-assets/angel-one-hls-apple/master.m3u8"/>
+      </video>
+    </div>
+```
+
+NOTE: Please DO NOT specify both the `src` attribute on the `<video>` tag AND
+a `<source>` tag inside it.
+
+
 #### Continue the Tutorials
 
 Next, check out {@tutorial ui-customization}.

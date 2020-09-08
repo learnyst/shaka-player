@@ -28,6 +28,39 @@ var shaka = {};
 /** @namespace */
 shaka.extern = {};
 
+/**
+ * @typedef {{
+ *   base: string,
+ *   buffered: string,
+ *   played: string
+ * }}
+ *
+ * @property {string} base
+ *   The CSS background color applied to the base of the seek bar, on top of
+ *   which the buffer level and playback position are shown.
+ * @property {string} buffered
+ *   The CSS background color applied to the portion of the seek bar showing
+ *   what has been buffered ahead of the playback position.
+ * @property {string} played
+ *   The CSS background color applied to the portion of the seek bar showing
+ *   what has been played already.
+ */
+shaka.extern.UISeekBarColors;
+
+/**
+ * @typedef {{
+ *   base: string,
+ *   level: string
+ * }}
+ *
+ * @property {string} base
+ *   The CSS background color applied to the base of the volume bar, on top of
+ *   which the volume level is shown.
+ * @property {string} level
+ *   The CSS background color applied to the portion of the volume bar showing
+ *   the volume level.
+ */
+shaka.extern.UIVolumeBarColors;
 
 /**
  * @typedef {{
@@ -36,7 +69,15 @@ shaka.extern = {};
  *   addSeekBar: boolean,
  *   addBigPlayButton: boolean,
  *   castReceiverAppId: string,
- *   clearBufferOnQualityChange: boolean
+ *   clearBufferOnQualityChange: boolean,
+ *   showUnbufferedStart: boolean,
+ *   seekBarColors: shaka.extern.UISeekBarColors,
+ *   volumeBarColors: shaka.extern.UIVolumeBarColors,
+ *   trackLabelFormat: shaka.ui.TrackLabelFormat,
+ *   fadeDelay: number,
+ *   doubleClickForFullscreen: boolean,
+ *   enableKeyboardPlaybackControls: boolean,
+ *   enableFullscreenOnRotation: boolean
  * }}
  *
  * @property {!Array.<string>} controlPanelElements
@@ -58,6 +99,48 @@ shaka.extern = {};
  *   resolution is being buffered. Not clearing the buffer will mean
  *   we play the content in the previously selected resolution that we
  *   already have buffered before switching to the new resolution.
+ * @property {boolean} showUnbufferedStart
+ *   If true, color any unbuffered region at the start of the seek bar as
+ *   unbuffered (using the "base" color).  If false, color any unbuffered region
+ *   at the start of the seek bar as played (using the "played" color).
+ *   <br>
+ *   A value of false matches the default behavior of Chrome's native controls
+ *   and Shaka Player v3.0+.
+ *   <br>
+ *   A value of true matches the default behavior of Shaka Player v2.5.
+ *   <br>
+ *   Defaults to true in v2.5.  Will default to false in v3.0+.
+ * @property {shaka.extern.UISeekBarColors} seekBarColors
+ *   The CSS colors applied to the seek bar.  This allows you to override the
+ *   colors used in the linear gradient constructed in JavaScript, since you
+ *   cannot easily do this in pure CSS.
+ * @property {shaka.extern.UIVolumeBarColors} volumeBarColors
+ *   The CSS colors applied to the volume bar.  This allows you to override the
+ *   colors used in the linear gradient constructed in JavaScript, since you
+ *   cannot do this in pure CSS.
+ * @property {shaka.ui.TrackLabelFormat} trackLabelFormat
+ *   An enum that determines what is shown in the labels for text track and
+ *   audio variant selection.
+ *   LANGUAGE means that only the language of the item is shown.
+ *   ROLE means that only the role of the item is shown.
+ *   LANGUAGE_ROLE means both are shown, or just language if there is no role.
+ *   Defaults to LANGUAGE.
+ * @property {number} fadeDelay
+ *   The delay (in seconds) before fading out the controls once the user stops
+ *   interacting with them.  We recommend setting this to 3 on your cast
+ *   receiver UI.
+ *   Defaults to 0.
+ * @property {boolean} doubleClickForFullscreen
+ *   Whether or not double-clicking on the UI should cause it to enter
+ *   fullscreen.
+ *   Defaults to true.
+ * @property {boolean} enableKeyboardPlaybackControls
+ *   Whether or not playback controls via keyboard is enabled, such as seek
+ *   forward, seek backward, jump to the beginning/end of the video.
+ *   Defaults to true.
+ * @property {boolean} enableFullscreenOnRotation
+ *   Whether or not to enter/exit fullscreen mode when the screen is rotated.
+ *   Defaults to true.
  */
 shaka.extern.UIConfiguration;
 

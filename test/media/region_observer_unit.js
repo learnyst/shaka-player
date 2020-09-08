@@ -33,7 +33,8 @@ describe('RegionObserver', () => {
     onExitRegion = jasmine.createSpy('onExitRegion');
     onSkipRegion = jasmine.createSpy('onSkipRegion');
 
-    timeline = new shaka.media.RegionTimeline();
+    timeline = new shaka.media.RegionTimeline(
+        () => { return {start: 0, end: 100}; });
 
     observer = new shaka.media.RegionObserver(timeline);
     observer.setListeners(
@@ -85,8 +86,8 @@ describe('RegionObserver', () => {
     expect(onEnterRegion).toHaveBeenCalledOnceMoreWith([region, false]);
 
     poll(observer,
-      /* timeInSeconds= */ 8,
-      /* seeking= */ false);
+        /* timeInSeconds= */ 8,
+        /* seeking= */ false);
     expect(onEnterRegion).not.toHaveBeenCalled();
     expect(onExitRegion).not.toHaveBeenCalled();
     expect(onSkipRegion).not.toHaveBeenCalled();
@@ -319,18 +320,18 @@ describe('RegionObserver', () => {
   });
 
   /**
-   * @param {string} schemeId
+   * @param {string} id
    * @param {number} startTimeSeconds
    * @param {number} endTimeSeconds
    * @return {shaka.extern.TimelineRegionInfo}
    */
-  function createRegion(schemeId, startTimeSeconds, endTimeSeconds) {
+  function createRegion(id, startTimeSeconds, endTimeSeconds) {
     return {
-      schemeIdUri: schemeId,
+      schemeIdUri: 'urn:foo',
+      id: id,
       value: '',
       startTime: startTimeSeconds,
       endTime: endTimeSeconds,
-      id: '',
       eventElement: null,
     };
   }

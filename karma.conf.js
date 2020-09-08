@@ -83,6 +83,12 @@ module.exports = function(config) {
       // muxjs module next
       'node_modules/mux.js/dist/mux.min.js',
 
+      // EME encryption scheme polyfill, compiled into Shaka Player, but outside
+      // of the Closure deps system, so not in shaka-player.uncompiled.js.  This
+      // is specifically the compiled, minified, cross-browser build of it.
+      // eslint-disable-next-line max-len
+      'node_modules/eme-encryption-scheme-polyfill/dist/eme-encryption-scheme-polyfill.js',
+
       // load closure base, the deps tree, and the uncompiled library
       'third_party/closure/goog/base.js',
       'dist/deps.js',
@@ -104,6 +110,12 @@ module.exports = function(config) {
       // if --test-custom-asset *is not* present, we will add unit tests.
       // if --quick *is not* present, we will add integration tests.
       // if --external *is* present, we will add external asset tests.
+
+      // load relevant demo files
+      {
+        pattern: 'demo/!(main|load|demo_uncompiled|service_worker).js',
+        included: true,
+      },
 
       // source files - these are only watched and served
       {pattern: 'lib/**/*.js', included: false},

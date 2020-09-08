@@ -123,14 +123,15 @@ describe('Storage', function() {
       await player.destroy();
     });
 
-    // TODO: Still failing in Chrome canary 73 on 2018-12-12.
-    // Some combination of these bugs is preventing this test from working:
-    //   http://crbug.com/690583
-    //   http://crbug.com/887535
-    //   http://crbug.com/887635
-    //   http://crbug.com/883895
-    quarantinedIt('removes persistent license',
-        drmCheckAndRun(async function() {
+    // TODO: Make a test to ensure that setting delayLicenseRequestUntilPlayed
+    // to true doesn't break storage, once we have working tests for storing DRM
+    // content.
+    // See issue #2218.
+
+    // Quarantined due to http://crbug.com/1019298 where a load cannot happen
+    // immediately after a remove.  This can sometimes be fixed with a delay,
+    // but it is extremely flaky, so these are disabled until the bug is fixed.
+    quarantinedIt('removes persistent license', drmCheckAndRun(async () => {
       const TestManifestParser = shaka.test.TestScheme.ManifestParser;
 
       // PART 1 - Download and store content that has a persistent license
@@ -147,17 +148,10 @@ describe('Storage', function() {
       expect(manifest.offlineSessionIds).toBeTruthy();
       expect(manifest.offlineSessionIds.length).toBeTruthy();
 
-      // Work around http://crbug.com/887535 in which load cannot happen right
-      // after close.  Experimentally, we seem to need a ~1s delay, so we're
-      // using a 3s delay to ensure it doesn't flake.  Without this, we get
-      // error 6005 (FAILED_TO_CREATE_SESSION) with system code 70.
-      // TODO: Remove when Chrome is fixed
-      await shaka.test.Util.delay(3);
-
       // PART 2 - Check that the licences are stored.
       await withDrm(player, manifest, (drm) => {
         return Promise.all(manifest.offlineSessionIds.map(async (session) => {
-          let foundSession = await loadOfflineSession(drm, session);
+          const foundSession = await loadOfflineSession(drm, session);
           expect(foundSession).toBeTruthy();
         }));
       });
@@ -166,20 +160,11 @@ describe('Storage', function() {
       // sessions.
       await storage.remove(uri.toString());
 
-      // Work around http://crbug.com/887535 in which load cannot happen right
-      // after close.  Experimentally, we seem to need a ~1s delay, so we're
-      // using a 3s delay to ensure it doesn't flake.  Without this, we get
-      // error 6005 (FAILED_TO_CREATE_SESSION) with system code 70.
-      // TODO: Remove when Chrome is fixed
-      await shaka.test.Util.delay(3);
-
       // PART 4 - Check that the licenses were removed.
       try {
         await withDrm(player, manifest, (drm) => {
           return Promise.all(manifest.offlineSessionIds.map(async (session) => {
             let notFoundSession = await loadOfflineSession(drm, session);
-            // TODO: This is failing.  The session is actually found, possibly
-            // due to http://crbug.com/690583, but this is unclear.
             expect(notFoundSession).toBeFalsy();
           }));
         });
@@ -191,30 +176,9 @@ describe('Storage', function() {
       }
     }));
 
-    // TODO: Still failing in Chrome canary 73 on 2018-12-12.
-    // Some combination of these bugs is preventing this test from working:
-    //   http://crbug.com/690583
-    //   http://crbug.com/887535
-    //   http://crbug.com/887635
-    //   http://crbug.com/883895
-    quarantinedIt('defers removing licenses on error',
-        drmCheckAndRun(async function() {
+    quarantinedIt('defers removing licenses on error', drmCheckAndRun(
+      async () => {
       const TestManifestParser = shaka.test.TestScheme.ManifestParser;
-      const getEmeSessions = async () => {
-        /** @type {!shaka.offline.StorageMuxer} */
-        const muxer = new shaka.offline.StorageMuxer();
-        await muxer.init();
-
-        /** @type {!Array.<!Promise>} */
-        const promises = [];
-        muxer.forEachEmeSessionCell((cell) => promises.push(cell.getAll()));
-        const cellByMechanism = await Promise.all(promises);
-        await muxer.destroy();
-        return cellByMechanism.reduce(shaka.util.Functional.collapseArrays, []);
-      };
-
-      const oldSessions = await getEmeSessions();
-      expect(oldSessions).toEqual([]);
 
       // PART 1 - Download and store content that has a persistent license
       //          associated with it.
@@ -243,17 +207,12 @@ describe('Storage', function() {
       const storedContents = await storage.list();
       expect(storedContents).toEqual([]);
 
-      // TODO: Chrome has a bug that prevents loading the session a second time,
-      // so we can't check EME for the session.  Instead, check the database.
-      // This can be changed when http://crbug.com/887635 is fixed.
-      // TODO: Whether checking the database or loading the EME session, this
-      // will fail because of another Chrome bug.  Calling remove() causes the
-      // session to be removed without waiting for update.  So this entire
-      // feature is non-functional on Chrome.  The test can probably be made to
-      // pass once https://crbug.com/883895 is fixed, possibly after using a
-      // delay to work around http://crbug.com/887535 .
-      const sessions = await getEmeSessions();
-      expect(sessions.length).toBeGreaterThan(0);
+      await withDrm(player, manifest, (drm) => {
+        return Promise.all(manifest.offlineSessionIds.map(async (session) => {
+          const foundSession = await loadOfflineSession(drm, session);
+          expect(foundSession).toBeTruthy();
+        }));
+      });
 
       // PART 5 - Disable the error and remove the EME session.
       storage.getNetworkingEngine().clearAllRequestFilters();
@@ -261,8 +220,6 @@ describe('Storage', function() {
       expect(didRemoveAll).toBe(true);
 
       // PART 6 - Check that the licenses were removed.
-      const endSessions = await getEmeSessions();
-      expect(endSessions).toEqual([]);
       try {
         await withDrm(player, manifest, (drm) => {
           return Promise.all(manifest.offlineSessionIds.map(async (session) => {
@@ -398,44 +355,62 @@ describe('Storage', function() {
     /** @type {!shaka.offline.Storage} */
     let storage;
 
-    beforeEach(function() {
-      shaka.offline.StorageMuxer.overrideSupport(new Map());
+    // CAUTION: Do not put overrideSupport() or clearSupport() in
+    // beforEach/afterEach.  They change what is supported at a static level.
+    // When the test is run, a shim will call the support check and the test
+    // will be skipped if overrideSupport() has been called already.  A shim of
+    // afterEach will call the same check and skip afterEach's body, too, and
+    // the clean up will never happen.  So the calls to overrideSupport() and
+    // clearSupport() must be in each test using try/finally.
 
+    beforeEach(() => {
       player = new shaka.Player();
       storage = new shaka.offline.Storage(player);
+      // NOTE: See above "CAUTION" comment about overrideSupport/clearSupport.
     });
 
     afterEach(async function() {
       await storage.destroy();
       await player.destroy();
-
-      shaka.offline.StorageMuxer.clearOverride();
+      // NOTE: See above "CAUTION" comment about overrideSupport/clearSupport.
     });
 
     it('throws error using list', async function() {
       try {
+        shaka.offline.StorageMuxer.overrideSupport(new Map());
+
         await storage.list();
         fail();
       } catch (e) {
         expect(e.code).toBe(shaka.util.Error.Code.STORAGE_NOT_SUPPORTED);
+      } finally {
+        shaka.offline.StorageMuxer.clearOverride();
       }
     });
 
     it('throws error using store', async function() {
       try {
+        shaka.offline.StorageMuxer.overrideSupport(new Map());
+
         await storage.store('the-uri-wont-matter');
         fail();
       } catch (e) {
         expect(e.code).toBe(shaka.util.Error.Code.STORAGE_NOT_SUPPORTED);
+      } finally {
+        shaka.offline.StorageMuxer.clearOverride();
       }
     });
 
     it('throws error using remove', async function() {
       try {
+        shaka.offline.StorageMuxer.overrideSupport(new Map());
+
         await storage.remove('the-uri-wont-matter');
         fail();
       } catch (e) {
         expect(e.code).toBe(shaka.util.Error.Code.STORAGE_NOT_SUPPORTED);
+      } finally {
+        shaka.offline.StorageMuxer.clearOverride();
       }
     });
   });
@@ -745,34 +720,31 @@ describe('Storage', function() {
       });
     }));
 
-    it('only stores chosen tracks', checkAndRun(async function() {
+    it('only stores chosen tracks', checkAndRun(async () => {
       // Change storage to only store one track so that it will be easy
-      // for use to ensure that only the one track was stored.
-      let selectTrack = (tracks) => {
+      // for us to ensure that only the one track was stored.
+      const selectTracks = (tracks) => {
         let selected = tracks.filter((t) => t.language == frenchCanadian);
         expect(selected.length).toBe(1);
         return selected;
       };
       storage.configure({
         offline: {
-          trackSelectionCallback: selectTrack,
+          trackSelectionCallback: selectTracks,
         },
       });
 
       // Stored content should reflect the tracks in the first period, so we
       // should only find track there.
-      let stored = await storage.store(
+      const stored = await storage.store(
           manifestWithPerStreamBandwidthUri, noMetadata, FakeManifestParser);
-      expect(stored).toBeTruthy();
-      expect(stored.tracks).toBeTruthy();
       expect(stored.tracks.length).toBe(1);
       expect(stored.tracks[0].language).toBe(frenchCanadian);
 
       // Pull the manifest out of storage so that we can ensure that it only
       // has one variant.
       /** @type {shaka.offline.OfflineUri} */
-      let uri = shaka.offline.OfflineUri.parse(stored.offlineUri);
-      expect(uri).toBeTruthy();
+      const uri = shaka.offline.OfflineUri.parse(stored.offlineUri);
 
       /** @type {!shaka.offline.StorageMuxer} */
       const muxer = new shaka.offline.StorageMuxer();
@@ -781,26 +753,38 @@ describe('Storage', function() {
         await muxer.init();
         let cell = await muxer.getCell(uri.mechanism(), uri.cell());
         let manifests = await cell.getManifests([uri.key()]);
-        expect(manifests).toBeTruthy();
         expect(manifests.length).toBe(1);
 
         let manifest = manifests[0];
-        expect(manifest).toBeTruthy();
-        expect(manifest.periods).toBeTruthy();
         expect(manifest.periods.length).toBe(1);
 
         let period = manifest.periods[0];
-        expect(period).toBeTruthy();
-        expect(period.streams).toBeTruthy();
         // There should be 2 streams, an audio and a video stream.
         expect(period.streams.length).toBe(2);
 
         let audio = period.streams.filter((s) => s.contentType == 'audio')[0];
-        expect(audio).toBeTruthy();
         expect(audio.language).toBe(frenchCanadian);
       } finally {
         await muxer.destroy();
       }
+    }));
+
+    it('can choose tracks asynchronously', checkAndRun(async () => {
+      storage.configure({
+        offline: {
+          trackSelectionCallback: async (tracks) => {
+            await shaka.test.Util.delay(0.1);
+            const selected = tracks.filter((t) => t.language == frenchCanadian);
+            expect(selected.length).toBe(1);
+            return selected;
+          },
+        },
+      });
+
+      const stored = await storage.store(
+          manifestWithPerStreamBandwidthUri, noMetadata, FakeManifestParser);
+      expect(stored.tracks.length).toBe(1);
+      expect(stored.tracks[0].language).toBe(frenchCanadian);
     }));
 
     it('stores drm info without license', checkAndRun(async function() {
@@ -942,31 +926,7 @@ describe('Storage', function() {
           }
         }));
 
-    it('throws an error if DRM sessions are not ready',
-        checkAndRun(async function() {
-          const drmInfo = makeDrmInfo();
-          const noSessions = [];
-
-          // TODO(vaage): Is there a way we can set the session ids without
-          //              needing to overload an internal call in storage.
-          let drm = new shaka.test.FakeDrmEngine();
-          drm.setDrmInfo(drmInfo);
-          drm.setSessionIds(noSessions);
-
-          overrideDrmAndManifest(
-              storage,
-              drm,
-              makeManifestWithPerStreamBandwidth());
-
-          try {
-            await storage.store(manifestWithPerStreamBandwidthUri);
-            fail();
-          } catch (e) {
-            expect(e.code).toBe(shaka.util.Error.Code.NO_INIT_DATA_FOR_OFFLINE);
-          }
-        }));
-
-    it('throws an error if destroyed mid-store', checkAndRun(async function() {
+    it('throws an error if destroyed mid-store', checkAndRun(async () => {
       const manifest = makeManifestWithPerStreamBandwidth();
 
       /**
@@ -1182,6 +1142,7 @@ describe('Storage', function() {
       width: height * (16 / 9),
       height: height,
       frameRate: 30,
+      pixelAspectRatio: '59:54',
       mimeType: 'video/mp4,audio/mp4',
       codecs: 'mp4,mp4',
       audioCodec: 'mp4',
@@ -1192,6 +1153,7 @@ describe('Storage', function() {
       videoId: videoId,
       audioId: audioId,
       channelsCount: 2,
+      audioSamplingRate: 48000,
       audioBandwidth: bandwidth * 0.33,
       videoBandwidth: bandwidth * 0.67,
       originalVideoId: videoId.toString(),
@@ -1217,6 +1179,7 @@ describe('Storage', function() {
       width: null,
       height: null,
       frameRate: null,
+      pixelAspectRatio: null,
       mimeType: 'text/vtt',
       codecs: 'vtt',
       audioCodec: null,
@@ -1227,6 +1190,7 @@ describe('Storage', function() {
       videoId: null,
       audioId: null,
       channelsCount: null,
+      audioSamplingRate: null,
       audioBandwidth: null,
       videoBandwidth: null,
       originalVideoId: null,

@@ -20,6 +20,7 @@ describe('HlsParser', function() {
   const ManifestParser = shaka.test.ManifestParser;
   const TextStreamKind = shaka.util.ManifestParserUtils.TextStreamKind;
   const Util = shaka.test.Util;
+  const originalAlwaysWarn = shaka.log.alwaysWarn;
 
   const vttText = [
     'WEBVTT\n',
@@ -42,6 +43,10 @@ describe('HlsParser', function() {
   let segmentData;
   /** @type {!ArrayBuffer} */
   let selfInitializingSegmentData;
+
+  afterEach(() => {
+    shaka.log.alwaysWarn = originalAlwaysWarn;
+  });
 
   beforeEach(function() {
     // TODO: use StreamGenerator?
@@ -719,6 +724,46 @@ describe('HlsParser', function() {
     await testHlsParser(master, media, manifest);
   });
 
+  it('parses characteristics from audio tags', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,mp4a",',
+      'RESOLUTION=960x540,FRAME-RATE=60,AUDIO="aud1"\n',
+      'video\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud1",LANGUAGE="en",',
+      'URI="audio"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud1",LANGUAGE="en",',
+      'CHARACTERISTICS="public.accessibility.describes-video",URI="audio2"\n',
+    ].join('');
+
+    const media = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      '#EXT-X-BYTERANGE:121090@616\n',
+      'main.mp4',
+    ].join('');
+
+    const manifest = new shaka.test.ManifestGenerator()
+            .anyTimeline()
+            .addPeriod(0)
+              .addPartialVariant()
+                .language('en')
+                .addPartialStream(ContentType.VIDEO)
+                .addPartialStream(ContentType.AUDIO)
+                  .language('en')
+              .addPartialVariant()
+                .language('en')
+                .addPartialStream(ContentType.VIDEO)
+                .addPartialStream(ContentType.AUDIO)
+                  .language('en')
+                  .roles(['public.accessibility.describes-video'])
+          .build();
+
+    await testHlsParser(master, media, manifest);
+  });
+
   it('should call filterAllPeriods for parsing', function(done) {
     const master = [
       '#EXTM3U\n',
@@ -975,12 +1020,194 @@ describe('HlsParser', function() {
     expect(period.variants[0].video).toBeTruthy();
   });
 
+  it('Disable audio does not create audio streams', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="sub1",LANGUAGE="eng",',
+      'URI="text"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud1",LANGUAGE="eng",',
+      'CHANNELS="2",URI="audio"\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,mp4a",',
+      'RESOLUTION=960x540,FRAME-RATE=60,AUDIO="aud1",SUBTITLES="sub1"\n',
+      'video\n',
+    ].join('');
+
+    const video = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const audio = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const text = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      '#EXT-X-BYTERANGE:121090@616\n',
+      'main.vtt',
+    ].join('');
+
+    fakeNetEngine
+        .setResponseText('test:/master', master)
+        .setResponseText('test:/audio', audio)
+        .setResponseText('test:/video', video)
+        .setResponseText('test:/text', text)
+        .setResponseText('test:/main.vtt', vttText)
+        .setResponseValue('test:/init.mp4', initSegmentData)
+        .setResponseValue('test:/main.mp4', segmentData);
+
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableAudio = true;
+    parser.configure(config);
+
+    const actual = await parser.start('test:/master', playerInterface);
+    const variant = actual.periods[0].variants[0];
+    expect(variant.audio).toBe(null);
+    expect(variant.video).toBeTruthy();
+  });
+
+  it('Disable video does not create video streams', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="sub1",LANGUAGE="eng",',
+      'URI="text"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud1",LANGUAGE="eng",',
+      'CHANNELS="2",URI="audio"\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,mp4a",',
+      'RESOLUTION=960x540,FRAME-RATE=60,AUDIO="aud1",SUBTITLES="sub1"\n',
+      'video\n',
+    ].join('');
+
+    const video = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const audio = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const text = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      '#EXT-X-BYTERANGE:121090@616\n',
+      'main.vtt',
+    ].join('');
+
+    fakeNetEngine
+        .setResponseText('test:/master', master)
+        .setResponseText('test:/audio', audio)
+        .setResponseText('test:/video', video)
+        .setResponseText('test:/text', text)
+        .setResponseText('test:/main.vtt', vttText)
+        .setResponseValue('test:/init.mp4', initSegmentData)
+        .setResponseValue('test:/main.mp4', segmentData);
+
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableVideo = true;
+    parser.configure(config);
+
+    const actual = await parser.start('test:/master', playerInterface);
+    const variant = actual.periods[0].variants[0];
+    expect(variant.audio).toBeTruthy();
+    expect(variant.video).toBe(null);
+  });
+
+  it('Disable text does not create text streams', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="sub1",LANGUAGE="eng",',
+      'URI="text"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="aud1",LANGUAGE="eng",',
+      'CHANNELS="2",URI="audio"\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,mp4a",',
+      'RESOLUTION=960x540,FRAME-RATE=60,AUDIO="aud1",SUBTITLES="sub1"\n',
+      'video\n',
+    ].join('');
+
+    const video = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const audio = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="init.mp4",BYTERANGE="616@0"\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+      '#EXTINF:5,\n',
+      'main.mp4\n',
+    ].join('');
+
+    const text = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      '#EXT-X-BYTERANGE:121090@616\n',
+      'main.vtt',
+    ].join('');
+
+    fakeNetEngine
+        .setResponseText('test:/master', master)
+        .setResponseText('test:/audio', audio)
+        .setResponseText('test:/video', video)
+        .setResponseText('test:/text', text)
+        .setResponseText('test:/main.vtt', vttText)
+        .setResponseValue('test:/init.mp4', initSegmentData)
+        .setResponseValue('test:/main.mp4', segmentData);
+
+    const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+    config.disableText = true;
+    parser.configure(config);
+
+    const actual = await parser.start('test:/master', playerInterface);
+    const stream = actual.periods[0].textStreams[0];
+    expect(stream).toBeUndefined();
+  });
+
   it('parses manifest with MP4+TTML streams', async () => {
     const master = [
       '#EXTM3U\n',
       '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="sub1",LANGUAGE="eng",',
       'URI="text"\n',
-      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,stpp.TTML.im1t",',
+      '#EXT-X-STREAM-INF:BANDWIDTH=200,CODECS="avc1,stpp.ttml.im1t",',
       'RESOLUTION=960x540,FRAME-RATE=60,SUBTITLES="sub1"\n',
       'video\n',
     ].join('');
@@ -1001,7 +1228,7 @@ describe('HlsParser', function() {
                 .addPartialStream(ContentType.VIDEO)
               .addPartialStream(ContentType.TEXT)
                 .language('en')
-                .mime('application/mp4', 'stpp.TTML.im1t')
+                .mime('application/mp4', 'stpp.ttml.im1t')
           .build();
 
     fakeNetEngine
@@ -1349,11 +1576,14 @@ describe('HlsParser', function() {
     const initDataBase64 =
         'dGhpcyBpbml0IGRhdGEgY29udGFpbnMgaGlkZGVuIHNlY3JldHMhISE=';
 
+    const keyId = 'abc123';
+
     const media = [
       '#EXTM3U\n',
       '#EXT-X-TARGETDURATION:6\n',
       '#EXT-X-PLAYLIST-TYPE:VOD\n',
       '#EXT-X-KEY:METHOD=SAMPLE-AES-CTR,',
+      'KEYID=0X' + keyId + ',',
       'KEYFORMAT="urn:uuid:edef8ba9-79d6-4ace-a3c8-27dcd51d21ed",',
       'URI="data:text/plain;base64,',
       initDataBase64, '",\n',
@@ -1372,6 +1602,7 @@ describe('HlsParser', function() {
                 .addPartialStream(ContentType.VIDEO)
                   .encrypted(true)
           .build();
+    manifest.periods[0].variants[0]['sample'].drmInfos[0].keyIds = [keyId];
 
     await testHlsParser(master, media, manifest);
   });
@@ -1615,6 +1846,8 @@ describe('HlsParser', function() {
     let segmentDataStartTime;
     /** @type {!ArrayBuffer} */
     let tsSegmentData;
+    /** @type {!ArrayBuffer} */
+    let nullTsPacketData;
 
     const master = [
       '#EXTM3U\n',
@@ -1668,6 +1901,10 @@ describe('HlsParser', function() {
       // 180000 (TS PTS) divided by fixed TS timescale (90000) = 2s.
       // 2000 (MP4 PTS) divided by parsed MP4 timescale (1000) = 2s.
       segmentDataStartTime = 2;
+      nullTsPacketData = new Uint8Array([
+        0x47, // TS sync byte (fixed value)
+        0x1f, 0xff, // null packet (packet ID 8191)
+      ]).buffer;
     });
 
     it('parses start time from mp4 segment', async () => {
@@ -1722,6 +1959,50 @@ describe('HlsParser', function() {
       let manifest = await parser.start('test:/master', playerInterface);
       let video = manifest.periods[0].variants[0].video;
       ManifestParser.verifySegmentIndex(video, [ref]);
+
+      // Make sure the segment data was fetched with the correct byte
+      // range.
+      fakeNetEngine.expectRangeRequest(
+          'test:/main.ts',
+          expectedStartByte,
+          partialEndByte);
+
+      // In VOD content, we set the presentationTimeOffset to align the
+      // content to presentation time 0.
+      expect(video.presentationTimeOffset).toEqual(segmentDataStartTime);
+    });
+
+    it('parses start time from ts segments with null packets', async () => {
+      const tsMediaPlaylist = media.replace(/\.mp4/g, '.ts');
+
+      // Each packet is 188 bytes, so allocate space for 3.
+      const tsSegmentWithNullPackets = new Uint8Array(188 * 3);
+      // The first two are "null" packets.
+      tsSegmentWithNullPackets.set(
+          new Uint8Array(nullTsPacketData), /* offset= */ 0);
+      tsSegmentWithNullPackets.set(
+          new Uint8Array(nullTsPacketData), /* offset= */ 188);
+      // The third has a timestamp.
+      tsSegmentWithNullPackets.set(
+          new Uint8Array(tsSegmentData), /* offset= */ 188 * 2);
+
+      fakeNetEngine
+          .setResponseText('test:/master', master)
+          .setResponseText('test:/video', tsMediaPlaylist)
+          .setResponseValue('test:/main.ts', tsSegmentWithNullPackets.buffer);
+
+      const expectedRef = ManifestParser.makeReference(
+          /* uri= */ 'test:/main.ts',
+          /* position= */ 0,
+          /* startTime= */ 0,
+          /* endTime= */ 5,
+          /* baseUri= */ '',
+          expectedStartByte,
+          expectedEndByte);
+
+      const manifest = await parser.start('test:/master', playerInterface);
+      const video = manifest.periods[0].variants[0].video;
+      ManifestParser.verifySegmentIndex(video, [expectedRef]);
 
       // Make sure the segment data was fetched with the correct byte
       // range.
@@ -1795,6 +2076,26 @@ describe('HlsParser', function() {
       // even though the endTime of the segment is larger.
       expect(ref.endTime - ref.startTime).toEqual(5);
       expect(presentationTimeline.getDuration()).toEqual(5);
+    });
+
+    it('forces full segment request', async () => {
+      fakeNetEngine
+          .setResponseText('test:/master', master)
+          .setResponseText('test:/video', media)
+          .setResponseValue('test:/init.mp4', initSegmentData)
+          .setResponseValue('test:/main.mp4', segmentData);
+
+      const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+      config.hls.useFullSegmentsForStartTime = true;
+      parser.configure(config);
+      await parser.start('test:/master', playerInterface);
+
+      // Make sure the segment data was fetched with the correct byte
+      // range.
+      fakeNetEngine.expectRangeRequest(
+          'test:/main.mp4',
+          expectedStartByte,
+          expectedEndByte);
     });
   });
 
@@ -2046,5 +2347,74 @@ describe('HlsParser', function() {
           .build();
 
     await testHlsParser(master, media, manifest);
+  });
+
+  it('skips raw audio formats', async () => {
+    const master = [
+      '#EXTM3U\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",URI="audio1"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",URI="audio2"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",URI="audio3"\n',
+      '#EXT-X-MEDIA:TYPE=AUDIO,GROUP-ID="audio",URI="audio4"\n',
+      '#EXT-X-STREAM-INF:BANDWIDTH=400,CODECS="avc1,mp4a",',
+      'RESOLUTION=1280x720,AUDIO="audio"\n',
+      'video\n',
+    ].join('');
+
+    const videoMedia = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXT-X-MAP:URI="v-init.mp4"\n',
+      '#EXTINF:5,\n',
+      'v1.mp4',
+    ].join('');
+
+    const audioMedia1 = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      'a1.mp3',
+    ].join('');
+
+    const audioMedia2 = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      'a1.aac',
+    ].join('');
+
+    const audioMedia3 = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      'a1.ac3',
+    ].join('');
+
+    const audioMedia4 = [
+      '#EXTM3U\n',
+      '#EXT-X-PLAYLIST-TYPE:VOD\n',
+      '#EXTINF:5,\n',
+      'a1.ec3',
+    ].join('');
+
+    fakeNetEngine
+        .setResponseText('test:/master', master)
+        .setResponseText('test:/video', videoMedia)
+        .setResponseText('test:/audio1', audioMedia1)
+        .setResponseText('test:/audio2', audioMedia2)
+        .setResponseText('test:/audio3', audioMedia3)
+        .setResponseText('test:/audio4', audioMedia4)
+        .setResponseValue('test:/v-init.mp4', initSegmentData)
+        .setResponseValue('test:/v1.mp4', segmentData);
+
+    const alwaysWarnSpy = jasmine.createSpy('shaka.log.alwaysWarn');
+    shaka.log.alwaysWarn = shaka.test.Util.spyFunc(alwaysWarnSpy);
+
+    const manifest = await parser.start('test:/master', playerInterface);
+    expect(manifest.periods[0].variants.length).toBe(1);
+    expect(manifest.periods[0].variants[0].audio).toBe(null);
+
+    // We should log a warning when this happens.
+    expect(alwaysWarnSpy).toHaveBeenCalled();
   });
 });

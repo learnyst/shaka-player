@@ -17,8 +17,8 @@ const config = {
 ui.configure(config);
 ```
 
-Controls will fire a {@link shaka.Controls.UIUpdatedEvent} event once the config
-takes effect.
+Controls will fire a {@link shaka.ui.Controls.UIUpdatedEvent} event once the
+config takes effect.
 See the docs for {@link shaka.extern.UIConfiguration} for more information.
 
 #### Customizing the number and order of controls
@@ -28,15 +28,22 @@ fast-forwarding. You could add the following line to init(), right before
 creating the UI overlay. This will configure UI to ONLY provide these two buttons:
 
 ```js
-uiConfig['controlPanelElements'] = ['rewind', 'fast_forward'];
+const config = {
+  'controlPanelElements': ['rewind', 'fast_forward']
+}
+ui.configure(config);
 ```
 This call will result in the controls panel having only two elements: rewind
 button and fast forward button, in that order. If the reversed order is desired,
 the call should be:
 
 ```js
-uiConfig['controlPanelElements'] = ['fast_forward', 'rewind'];
+const config = {
+ 'controlPanelElements': ['fast_forward', 'rewind']
+}
+ui.configure(config);
 ```
+
 The following elements can be added to the UI bar using this configuration value:
 * time_and_duration: adds an element tracking and displaying current progress of
   the presentation and the full presentation duration in the "0:10 / 1:00"
@@ -68,6 +75,18 @@ The following buttons can be added to the overflow menu:
   that support it. Button is invisible on other browsers.
 <!-- TODO: If we add more buttons that can be put in the order this way, list them here. -->
 
+Example:
+```js
+// Add only the cast button to the overflow menu, nothing else
+const config = {
+  'overflowMenuButtons' : ['cast']
+}
+ui.configure(config);
+```
+
+An important note: the 'overflow_menu' button needs to be part of the 'controlPanelElements'
+layout for the overflow menu to be available to the user.
+
 The presense of the seek bar and the big play button in the center of the video element can be
 customized with `addSeekBar` and `addBigPlayButton` booleans in the config.
 
@@ -75,11 +94,30 @@ UI layout can be reconfigured at any point after it's been created.
 Please note that custom layouts might need CSS adjustments to look good.
 
 #### Changing seek bar progress colors
-<!-- TODO: Is there a better way to do this? (The actual thing, not the tutorial) -->
 The seek bar consists of three segments: past (already played part of the presentation),
-future-buffered and future-unbuffered. The segments colors are set when the seek bar is created.
-To customize the colors, change the values of `shaka.ui.Constants.SEEK_BAR_BASE_COLOR` ,
-`shaka.ui.Constants.SEEK_BAR_PLAYED_COLOR`, and `shaka.ui.Constants.SEEK_BAR_BUFFERED_COLOR` in ui/controls.js
+future-buffered and future-unbuffered.
+To customize the colors, add your values to the config object under `seekBarColors`:
+ ```js
+const config = {
+  'seekBarColors': {
+    base: 'rgba(255, 255, 255, 0.3)',
+    buffered: 'rgba(255, 255, 255, 0.54)',
+    played: 'rgb(255, 255, 255)',
+  }
+}
+ui.configure(config);
+```
+
+If you're using our ad API, you can also specify the color for the ad break markers on
+the timeline:
+ ```js
+const config = {
+  'seekBarColors': {
+    adBreaks: 'rgb(255, 204, 0)',
+  }
+}
+ui.configure(config);
+```
 
 
 #### Creating custom elements and adding them to the UI
@@ -107,7 +145,7 @@ myapp.SkipButton = class extends shaka.ui.Element {
 
     // Listen for clicks on the button to start the next playback
     this.eventManager.listen(this.button_, 'click', () => {
-      let nextManifest = /* Your logic to pick the next video to be played */
+      const nextManifest = /* Your logic to pick the next video to be played */
         myapp.getNextManifest();
 
       // shaka.ui.Element gives us access to the player object as member of the class
