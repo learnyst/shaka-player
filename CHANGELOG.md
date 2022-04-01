@@ -1,6 +1,6 @@
 # Changelog
 
-### 3.4.4 (2022-01-28)
+## 3.4.5 (2022-01-28)
 
 Bugfixes:
   - Fix duplicate CMCD parameters in HLS live content
