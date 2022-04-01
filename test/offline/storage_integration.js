@@ -1751,7 +1751,7 @@ filterDescribe('Storage', storageSupport, () => {
    */
   function loadOfflineSession(drmEngine, sessionName) {
     // Modified by sridhar
-    return drmEngine.loadOfflineSession_(sessionName, null);
+    return drmEngine.loadOfflineSession_(sessionName, null, null);
   }
 
   /**
