@@ -17,7 +17,8 @@
  *   textStreams: !Array.<shaka.extern.Stream>,
  *   imageStreams: !Array.<shaka.extern.Stream>,
  *   offlineSessionIds: !Array.<string>,
- *   minBufferTime: number
+ *   minBufferTime: number,
+ *   sequenceMode: boolean
  * }}
  *
  * @description
@@ -72,6 +73,9 @@
  *   The minimum number of seconds of content that must be buffered before
  *   playback can begin.  Can be overridden by a higher value from the Player
  *   configuration.
+ * @property {boolean} sequenceMode
+ *   If true, we will append the media segments using sequence mode; that is to
+ *   say, ignoring any timestamps inside the media files.
  *
  * @exportDoc
  */
@@ -111,6 +115,7 @@ shaka.extern.InitDataOverride;
  *   audioRobustness: string,
  *   videoRobustness: string,
  *   serverCertificate: Uint8Array,
+ *   serverCertificateUri: string,
  *   sessionType: string,
  *   initData: Array.<!shaka.extern.InitDataOverride>,
  *   keyIds: Set.<string>
@@ -150,6 +155,10 @@ shaka.extern.InitDataOverride;
  *   A key-system-specific server certificate used to encrypt license requests.
  *   Its use is optional and is meant as an optimization to avoid a round-trip
  *   to request a certificate.
+ * @property {string} serverCertificateUri
+ *   <i>Defaults to '', e.g., server certificate will be requested from the
+ *   given URI if serverCertificate is not provided. Can be filled in by
+ *   advanced DRM config.</i>
  * @property {Array.<!shaka.extern.InitDataOverride>} initData
  *   <i>Defaults to [], e.g., no override.</i> <br>
  *   A list of initialization data which override any initialization data found
@@ -233,6 +242,7 @@ shaka.extern.CreateSegmentIndexFunction;
  *   id: number,
  *   originalId: ?string,
  *   createSegmentIndex: shaka.extern.CreateSegmentIndexFunction,
+ *   closeSegmentIndex: (function()|undefined),
  *   segmentIndex: shaka.media.SegmentIndex,
  *   mimeType: string,
  *   codecs: string,
@@ -258,7 +268,10 @@ shaka.extern.CreateSegmentIndexFunction;
  *   audioSamplingRate: ?number,
  *   spatialAudio: boolean,
  *   closedCaptions: Map.<string, string>,
- *   tilesLayout: (string|undefined)
+ *   tilesLayout: (string|undefined),
+ *   matchedStreams:
+ *      (!Array.<shaka.extern.Stream>|!Array.<shaka.extern.StreamDB>|
+ *      undefined)
  * }}
  *
  * @description
@@ -275,6 +288,9 @@ shaka.extern.CreateSegmentIndexFunction;
  * @property {shaka.extern.CreateSegmentIndexFunction} createSegmentIndex
  *   <i>Required.</i> <br>
  *   Creates the Stream's segmentIndex (asynchronously).
+ * @property {(function()|undefined)} closeSegmentIndex
+ *   <i>Optional.</i> <br>
+ *   Closes the Stream's segmentIndex.
  * @property {shaka.media.SegmentIndex} segmentIndex
  *   <i>Required.</i> <br>
  *   May be null until createSegmentIndex() is complete.
@@ -328,7 +344,7 @@ shaka.extern.CreateSegmentIndexFunction;
  *   The Stream's label, unique text that should describe the audio/text track.
  * @property {string} type
  *   <i>Required.</i> <br>
- *   Content type (e.g. 'video', 'audio' or 'text')
+ *   Content type (e.g. 'video', 'audio' or 'text', 'image')
  * @property {boolean} primary
  *   <i>Defaults to false.</i> <br>
  *   True indicates that the player should use this Stream over others if user
@@ -365,6 +381,10 @@ shaka.extern.CreateSegmentIndexFunction;
  *   The value is a grid-item-dimension consisting of two positive decimal
  *   integers in the format: column-x-row ('4x3'). It describes the arrangement
  *   of Images in a Grid. The minimum valid LAYOUT is '1x1'.
+ * @property {(!Array.<shaka.extern.Stream>|!Array.<shaka.extern.StreamDB>|
+ *   undefined)} matchedStreams
+ *   The streams in all periods which match the stream. Used for Dash.
+ *
  * @exportDoc
  */
 shaka.extern.Stream;

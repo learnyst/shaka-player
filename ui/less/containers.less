@@ -6,8 +6,6 @@
 
 /* All of the top-level containers into which various visible features go. */
 
-@transparent: rgba(0, 0, 0, 0);
-
 /* A container for the entire video + controls combo.  This is the auto-setup
  * div which we populate. */
 .shaka-video-container {
@@ -19,13 +17,13 @@
 
   /* Set a special font for material design icons. */
   .material-icons-round {
-    font-family: 'Material Icons Round';
+    font-family: "Material Icons Round";
     font-size: 24px;
   }
 
   /* Set the fonts for all other content. */
   * {
-    font-family: Roboto-Regular, Roboto, sans-serif;
+    font-family: Roboto-Regular, Roboto, sans-serif, TengwarTelcontar;
   }
 }
 
@@ -157,6 +155,9 @@
     /* 32px tall controls. */
     height: 32px;
 
+    /* Consistent alignment of buttons. */
+    line-height: 0.5;
+
     /* Consistent margins (external) and padding (internal) between controls. */
     .bottom-panels-elements-margin();
 
@@ -192,6 +193,80 @@
   align-items: center;
 }
 
+.shaka-statistics-container {
+  overflow-x: hidden;
+  overflow-y: auto;
+
+  min-width: 300px;
+
+  color: white;
+  background-color: rgba(35 35 35 / 90%);
+
+  font-size: 14px;
+
+  padding: 5px 10px;
+  border-radius: 2px;
+
+  position: absolute;
+  z-index: 2;
+  left: 15px;
+  top: 15px;
+
+  /* Fades out with the other controls. */
+  .show-when-controls-shown();
+
+  div {
+    display: flex;
+    justify-content: space-between;
+  }
+
+  span {
+    color: rgb(150 150 150);
+  }
+}
+
+.shaka-context-menu {
+  background-color: rgba(35 35 35 / 90%);
+
+  border-radius: 2px;
+
+  position: absolute;
+  z-index: 3;
+
+  button {
+    padding: 5px 10px;
+
+    width: 100%;
+    display: flex;
+    align-items: center;
+
+    color: white;
+    background: transparent;
+    border: 0;
+    cursor: pointer;
+
+    &:hover {
+      background-color: rgba(50 50 50 / 90%);
+    }
+  }
+
+  label {
+    padding: 0 20px;
+
+    align-items: flex-start;
+
+    color: white;
+    cursor: pointer;
+  }
+
+  .shaka-current-selection-span {
+    align-items: flex-start;
+
+    color: white;
+    cursor: pointer;
+  }
+}
+
 .shaka-scrim-container {
   margin: 0;
   .fill-container();
@@ -200,7 +275,7 @@
   .show-when-controls-shown();
 
   /* A black gradient at the bottom, behind the controls, but only so high. */
-  background: linear-gradient(to top, rgba(0, 0, 0, 1) 0, @transparent 15%);
+  background: linear-gradient(to top, black 0, transparent 15%);
 }
 
 .shaka-text-container {
@@ -226,11 +301,13 @@
   transition-delay: 500ms;
 
   /* These are defaults which are overridden by JS or cue styles. */
-  span {
-    font-size: 20px;
-    line-height: 1.4;  // relative to font size.
-    background-color: rgba(0, 0, 0, 0.8);
-    color: rgb(255, 255, 255);
+  font-size: 20px;
+  line-height: 1.4;  // relative to font size.
+  color: white;
+
+  span.shaka-text-wrapper {
+    display: inline;
+    background: none;
   }
 }
 
@@ -269,11 +346,11 @@
 
   margin: 0;
   box-sizing: border-box;
-  padding: @spinner-size-percentage / 2;
+  padding: calc(@spinner-size-percentage / 2);
   width: 0;
   height: 0;
 
   /* Add a bit of a white shadow to keep our black spinner visible
   on a black background. */
-  filter: drop-shadow(0 0 2px rgba(255, 255, 255, 0.5));
+  filter: drop-shadow(0 0 2px rgba(255 255 255 / 50%));
 }

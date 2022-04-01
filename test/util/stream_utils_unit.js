@@ -184,7 +184,7 @@ describe('StreamUtils', () => {
     });
 
     it('chooses only one role, even if none is preferred', () => {
-      // Regression test for https://github.com/google/shaka-player/issues/949
+      // Regression test for https://github.com/shaka-project/shaka-player/issues/949
       manifest = shaka.test.ManifestGenerator.generate((manifest) => {
         manifest.addTextStream(0, (stream) => {
           stream.language = 'en';
@@ -223,7 +223,7 @@ describe('StreamUtils', () => {
     });
 
     it('chooses only one role, even if all are primary', () => {
-      // Regression test for https://github.com/google/shaka-player/issues/949
+      // Regression test for https://github.com/shaka-project/shaka-player/issues/949
       manifest = shaka.test.ManifestGenerator.generate((manifest) => {
         manifest.addTextStream(0, (stream) => {
           stream.language = 'en';
@@ -269,7 +269,7 @@ describe('StreamUtils', () => {
     });
 
     it('chooses only one language, even if all are primary', () => {
-      // Regression test for https://github.com/google/shaka-player/issues/918
+      // Regression test for https://github.com/shaka-project/shaka-player/issues/918
       manifest = shaka.test.ManifestGenerator.generate((manifest) => {
         manifest.addTextStream(0, (stream) => {
           stream.language = 'en';
@@ -488,7 +488,23 @@ describe('StreamUtils', () => {
       });
 
       await StreamUtils.getDecodingInfosForVariants(manifest.variants,
-          /* usePersistentLicenses= */false);
+          /* usePersistentLicenses= */false, /* srcEquals= */ false);
+      expect(manifest.variants.length).toBeTruthy();
+      expect(manifest.variants[0].decodingInfos.length).toBe(1);
+      expect(manifest.variants[0].decodingInfos[0].supported).toBeTruthy();
+    });
+
+    it('for srcEquals content', async () => {
+      manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+        manifest.addVariant(0, (variant) => {
+          variant.addVideo(1, (stream) => {
+            stream.mime('video/mp4', 'avc1.4d400d');
+          });
+        });
+      });
+
+      await StreamUtils.getDecodingInfosForVariants(manifest.variants,
+          /* usePersistentLicenses= */false, /* srcEquals= */ true);
       expect(manifest.variants.length).toBeTruthy();
       expect(manifest.variants[0].decodingInfos.length).toBe(1);
       expect(manifest.variants[0].decodingInfos[0].supported).toBeTruthy();
@@ -517,9 +533,50 @@ describe('StreamUtils', () => {
       });
 
       await StreamUtils.getDecodingInfosForVariants(manifest.variants,
-          /* usePersistentLicenses= */false);
+          /* usePersistentLicenses= */false, /* srcEquals= */ false);
       expect(manifest.variants.length).toBe(1);
       expect(manifest.variants[0].decodingInfos.length).toBe(0);
+    });
+
+    it('includes transferFunction in config when hdr', async () => {
+      const originalDecodingInfo = navigator.mediaCapabilities.decodingInfo;
+
+      try {
+        navigator.mediaCapabilities.decodingInfo =
+            shaka.test.Util.spyFunc(decodingInfoSpy);
+
+        manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+          manifest.addVariant(0, (variant) => {
+            variant.addVideo(0, (stream) => {
+              stream.mime('video/mp4', 'avc1.640028');
+              stream.hdr = 'SDR';
+            });
+          });
+          manifest.addVariant(1, (variant) => {
+            variant.addVideo(1, (stream) => {
+              stream.mime('video/mp4', 'hvc1.2.4.L150.90');
+              stream.hdr = 'PQ';
+            });
+          });
+          manifest.addVariant(2, (variant) => {
+            variant.addVideo(2, (stream) => {
+              stream.mime('video/mp4', 'hvc1.2.4.L153.B0');
+              stream.hdr = 'HLG';
+            });
+          });
+        });
+
+        await StreamUtils.getDecodingInfosForVariants(manifest.variants,
+            /* usePersistentLicenses= */ false, /* srcEquals= */ false);
+        expect(decodingInfoSpy.calls.argsFor(0)[0].video.transferFunction)
+            .toBe('srgb');
+        expect(decodingInfoSpy.calls.argsFor(1)[0].video.transferFunction)
+            .toBe('pq');
+        expect(decodingInfoSpy.calls.argsFor(2)[0].video.transferFunction)
+            .toBe('hlg');
+      } finally {
+        navigator.mediaCapabilities.decodingInfo = originalDecodingInfo;
+      }
     });
   });
 
@@ -567,10 +624,19 @@ describe('StreamUtils', () => {
           stream.mimeType = 'image/png';
         });
         manifest.addImageStream(3, (stream) => {
-          stream.mimeType = 'image/jpeg';
+          stream.mimeType = 'image/jpg';
         });
         manifest.addImageStream(4, (stream) => {
+          stream.mimeType = 'image/jpeg';
+        });
+        manifest.addImageStream(5, (stream) => {
           stream.mimeType = 'image/bogus';
+        });
+        manifest.addImageStream(6, (stream) => {
+          stream.mimeType = 'image/avif';
+        });
+        manifest.addImageStream(7, (stream) => {
+          stream.mimeType = 'image/webp';
         });
       });
 
@@ -579,12 +645,19 @@ describe('StreamUtils', () => {
           fakeDrmEngine, noVariant, manifest);
 
       // Covers a regression in which we would remove streams with codecs.
-      // The last two streams should be removed because their full MIME types
-      // are bogus.
-      expect(manifest.imageStreams.length).toBe(3);
-      expect(manifest.imageStreams[0].id).toBe(1);
-      expect(manifest.imageStreams[1].id).toBe(2);
-      expect(manifest.imageStreams[2].id).toBe(3);
+      // The first 4 streams should be there because they are always supported.
+      // The 5th stream should be removed because the MIME type is bogus.
+      // The 6th and 7th streams may be there, based on platform support.
+      expect(manifest.imageStreams).toContain(
+          jasmine.objectContaining({id: 1}));
+      expect(manifest.imageStreams).toContain(
+          jasmine.objectContaining({id: 2}));
+      expect(manifest.imageStreams).toContain(
+          jasmine.objectContaining({id: 3}));
+      expect(manifest.imageStreams).toContain(
+          jasmine.objectContaining({id: 4}));
+      expect(manifest.imageStreams).not.toContain(
+          jasmine.objectContaining({id: 5}));
     });
 
     it('filters transport streams', async () => {
@@ -601,8 +674,7 @@ describe('StreamUtils', () => {
       });
 
       await shaka.util.StreamUtils.filterManifest(
-          fakeDrmEngine, /* currentVariant= */ null, manifest,
-          /* useMediaCapabilities= */ true);
+          fakeDrmEngine, /* currentVariant= */ null, manifest);
 
       // Covers a regression in which we would remove streams with codecs.
       // The last two streams should be removed because their full MIME types
@@ -629,8 +701,7 @@ describe('StreamUtils', () => {
       });
 
       await shaka.util.StreamUtils.filterManifest(
-          fakeDrmEngine, /* currentVariant= */ null, manifest,
-          /* useMediaCapabilities= */ true);
+          fakeDrmEngine, /* currentVariant= */ null, manifest);
       expect(manifest.variants.length).toBe(1);
     });
 
@@ -647,8 +718,7 @@ describe('StreamUtils', () => {
       });
 
       await shaka.util.StreamUtils.filterManifest(
-          fakeDrmEngine, /* currentVariant= */ null, manifest,
-          /* useMediaCapabilities= */ true);
+          fakeDrmEngine, /* currentVariant= */ null, manifest);
 
       expect(manifest.variants.length).toBe(1);
     });
@@ -663,6 +733,7 @@ describe('StreamUtils', () => {
         variant.bandwidth = 5058558;
         variant.addAudio(1, (stream) => {
           stream.bandwidth = 129998;
+          stream.codecs = 'opus';
         });
         variant.addVideo(2, (stream) => {
           stream.bandwidth = 4928560;
@@ -677,6 +748,7 @@ describe('StreamUtils', () => {
         variant.bandwidth = 4911000;
         variant.addAudio(4, (stream) => {
           stream.bandwidth = 129998;
+          stream.codecs = 'vorbis';
         });
         variant.addVideo(5, (stream) => {
           stream.bandwidth = 4781002;
@@ -691,6 +763,7 @@ describe('StreamUtils', () => {
         variant.bandwidth = 10850316;
         variant.addAudio(7, (stream) => {
           stream.bandwidth = 129998;
+          stream.codecs = 'opus';
         });
         variant.addVideo(8, (stream) => {
           stream.bandwidth = 10784324;
@@ -700,6 +773,62 @@ describe('StreamUtils', () => {
       });
     };
 
+    it('chooses preferred audio and video codecs', () => {
+      manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+        addVariant1080Avc1(manifest);
+        addVariant1080Vp9(manifest);
+        addVariant2160Vp9(manifest);
+      });
+      const variants =
+          shaka.util.StreamUtils.choosePreferredCodecs(manifest.variants,
+              /* preferredVideoCodecs= */['vp09'],
+              /* preferredAudioCodecs= */['opus']);
+
+      expect(variants.length).toBe(1);
+      expect(variants[0].video.codecs).toBe(vp09Codecs);
+      expect(variants[0].audio.codecs).toBe('opus');
+    });
+
+    it('chooses preferred video codecs', () => {
+      // If no preferred audio codecs is specified or can be found, choose the
+      // variants with preferred video codecs.
+      manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+        addVariant1080Avc1(manifest);
+        addVariant1080Vp9(manifest);
+        addVariant2160Vp9(manifest);
+      });
+      const variants =
+          shaka.util.StreamUtils.choosePreferredCodecs(manifest.variants,
+              /* preferredVideoCodecs= */['vp09'],
+              /* preferredAudioCodecs= */[]);
+
+      expect(variants.length).toBe(2);
+      expect(variants[0].video.codecs).toBe(vp09Codecs);
+      expect(variants[0].audio.codecs).toBe('vorbis');
+      expect(variants[1].video.codecs).toBe(vp09Codecs);
+      expect(variants[1].audio.codecs).toBe('opus');
+    });
+
+    it('chooses preferred audio codecs', () => {
+      // If no preferred video codecs is specified or can be found, choose the
+      // variants with preferred audio codecs.
+      manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+        addVariant1080Avc1(manifest);
+        addVariant1080Vp9(manifest);
+        addVariant2160Vp9(manifest);
+      });
+      const variants =
+          shaka.util.StreamUtils.choosePreferredCodecs(manifest.variants,
+              /* preferredVideoCodecs= */['foo'],
+              /* preferredAudioCodecs= */['opus']);
+
+      expect(variants.length).toBe(2);
+      expect(variants[0].video.codecs).toBe(avc1Codecs);
+      expect(variants[0].audio.codecs).toBe('opus');
+      expect(variants[1].video.codecs).toBe(vp09Codecs);
+      expect(variants[1].audio.codecs).toBe('opus');
+    });
+
     it('chooses variants with different sizes (density) by codecs', () => {
       manifest = shaka.test.ManifestGenerator.generate((manifest) => {
         addVariant1080Avc1(manifest);
@@ -707,11 +836,14 @@ describe('StreamUtils', () => {
         addVariant2160Vp9(manifest);
       });
 
-      shaka.util.StreamUtils.chooseCodecsAndFilterManifest(manifest, 2);
+      shaka.util.StreamUtils.chooseCodecsAndFilterManifest(manifest,
+          /* preferredVideoCodecs= */[],
+          /* preferredAudioCodecs= */[],
+          /* preferredAudioChannelCount= */2,
+          /* preferredDecodingAttributes= */[]);
 
-      expect(manifest.variants.length).toBe(2);
+      expect(manifest.variants.length).toBe(1);
       expect(manifest.variants[0].video.codecs).toBe(vp09Codecs);
-      expect(manifest.variants[1].video.codecs).toBe(vp09Codecs);
     });
 
     it('chooses variants with same sizes (density) by codecs', () => {
@@ -720,10 +852,59 @@ describe('StreamUtils', () => {
         addVariant1080Vp9(manifest);
       });
 
-      shaka.util.StreamUtils.chooseCodecsAndFilterManifest(manifest, 2);
+      shaka.util.StreamUtils.chooseCodecsAndFilterManifest(manifest,
+          /* preferredVideoCodecs= */[],
+          /* preferredAudioCodecs= */[],
+          /* preferredAudioChannelCount= */2,
+          /* preferredDecodingAttributes= */[]);
 
       expect(manifest.variants.length).toBe(1);
       expect(manifest.variants[0].video.codecs).toBe(vp09Codecs);
+    });
+
+    it('chooses variants by decoding attributes', async () => {
+      manifest = shaka.test.ManifestGenerator.generate((manifest) => {
+        manifest.addVariant(0, (variant) => {
+          variant.bandwidth = 4058558;
+          variant.addVideo(1, (stream) => {
+            stream.mime('video', 'notsmooth');
+          });
+        });
+        manifest.addVariant(1, (variant) => {
+          variant.bandwidth = 4781002;
+          variant.addVideo(2, (stream) => {
+            stream.mime('video', 'smooth');
+          });
+        });
+        manifest.addVariant(3, (variant) => {
+          variant.addVideo(4, (stream) => {
+            variant.bandwidth = 5058558;
+            stream.mime('video', 'smooth-2');
+          });
+        });
+      });
+      navigator.mediaCapabilities.decodingInfo =
+          shaka.test.Util.spyFunc(decodingInfoSpy);
+      decodingInfoSpy.and.callFake((config) => {
+        const res = config.video.contentType.includes('notsmooth') ?
+           {supported: true, smooth: false} :
+           {supported: true, smooth: true};
+        return Promise.resolve(res);
+      });
+
+      await StreamUtils.getDecodingInfosForVariants(manifest.variants,
+          /* usePersistentLicenses= */false, /* srcEquals= */ false);
+
+      shaka.util.StreamUtils.chooseCodecsAndFilterManifest(manifest,
+          /* preferredVideoCodecs= */[],
+          /* preferredAudioCodecs= */[],
+          /* preferredAudioChannelCount= */2,
+          /* preferredDecodingAttributes= */
+          [shaka.util.StreamUtils.DecodingAttributes.SMOOTH]);
+      // 2 video codecs are smooth. Choose the one with the lowest bandwidth.
+      expect(manifest.variants.length).toBe(1);
+      expect(manifest.variants[0].id).toBe(1);
+      expect(manifest.variants[0].video.id).toBe(2);
     });
   });
 });

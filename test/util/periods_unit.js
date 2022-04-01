@@ -39,6 +39,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 2),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: 'ad',
@@ -49,6 +50,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 2),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -117,6 +119,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 2),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: 'main',
@@ -130,6 +133,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 2),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -194,6 +198,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -204,6 +209,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -242,6 +248,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -252,6 +259,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -289,6 +297,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('fr', /* channels= */ 2, /* primary= */ false),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: 'ad',
@@ -299,6 +308,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: 'show2',
@@ -311,6 +321,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('fr', /* channels= */ 2, /* primary= */ true),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -361,6 +372,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('es'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: 'show2',
@@ -371,6 +383,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -411,6 +424,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en'),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -428,7 +442,6 @@ describe('PeriodCombiner', () => {
     expect(lowBandwidth.video.originalId).toBe('480');
     expect(highBandwidth.video.originalId).toBe('480');
   });
-
 
   it('Filters out duplicate streams', async () => {
     // v1 and v3 are duplicates
@@ -464,7 +477,7 @@ describe('PeriodCombiner', () => {
     a3.originalId = 'a3';
     a3.bandwidth = 97065;
     a3.roles = ['role1', 'role2'];
-    a2.codecs = 'mp4a.40.2';
+    a3.codecs = 'mp4a.40.2';
 
     // a4 has a different label from a3, and should not
     // be filtered out.
@@ -487,14 +500,34 @@ describe('PeriodCombiner', () => {
     const t1 = makeTextStream('en');
     t1.originalId = 't1';
     t1.roles = ['role1'];
+    t1.bandwidth = 1158;
 
     const t2 = makeTextStream('en');
     t2.originalId = 't2';
     t2.roles = ['role1', 'role2'];
+    t2.bandwidth = 1172;
 
     const t3 = makeTextStream('en');
     t3.originalId = 't3';
     t3.roles = ['role1'];
+    t3.bandwidth = 1158;
+
+    // t4 has a different bandwidth from t3, and should not
+    // be filtered out.
+    const t4 = makeTextStream('en');
+    t4.originalId = 't4';
+    t4.roles = ['role1'];
+    t4.bandwidth = 1186;
+
+    // i1 and i3 are duplicates.
+    const i1 = makeImageStream(240);
+    i1.originalId = 'i1';
+
+    const i2 = makeImageStream(480);
+    i2.originalId = 'i2';
+
+    const i3 = makeImageStream(240);
+    i3.originalId = 'i3';
 
     /** @type {!Array.<shaka.util.PeriodCombiner.Period>} */
     const periods = [
@@ -516,6 +549,12 @@ describe('PeriodCombiner', () => {
           t1,
           t2,
           t3,
+          t4,
+        ],
+        imageStreams: [
+          i1,
+          i2,
+          i3,
         ],
       },
     ];
@@ -537,16 +576,68 @@ describe('PeriodCombiner', () => {
     }
 
     const textStreams = combiner.getTextStreams();
-    expect(textStreams.length).toBe(2);
+    expect(textStreams.length).toBe(3);
 
     // t3 should've been filtered out
     const textIds = textStreams.map((t) => t.originalId);
     for (const id of textIds) {
       expect(id).not.toBe('t3');
     }
+
+    const imageStreams = combiner.getImageStreams();
+    expect(imageStreams.length).toBe(2);
+
+    // i3 should've been filtered out
+    const imageIds = imageStreams.map((i) => i.originalId);
+    for (const id of imageIds) {
+      expect(id).not.toBe('i3');
+    }
   });
 
-  it('Text track gaps', async () => {
+  // Regression test for #3383, where we failed on multi-period content with
+  // multiple image streams per period.
+  it('Can handle multiple image streams', async () => {
+    /** @type {!Array.<shaka.util.PeriodCombiner.Period>} */
+    const periods = [
+      {
+        id: '1',
+        videoStreams: [
+          makeVideoStream(1280),
+        ],
+        audioStreams: [],
+        textStreams: [],
+        imageStreams: [
+          makeImageStream(240),
+          makeImageStream(480),
+        ],
+      },
+      {
+        id: '2',
+        videoStreams: [
+          makeVideoStream(1280),
+        ],
+        audioStreams: [],
+        textStreams: [],
+        imageStreams: [
+          makeImageStream(240),
+          makeImageStream(480),
+        ],
+      },
+    ];
+
+    await combiner.combinePeriods(periods, /* isDynamic= */ true);
+
+    const imageStreams = combiner.getImageStreams();
+    expect(imageStreams.length).toBe(2);
+
+    const imageIds = imageStreams.map((i) => i.originalId);
+    expect(imageIds).toEqual([
+      '240,240',
+      '480,480',
+    ]);
+  });
+
+  it('handles text track gaps', async () => {
     /** @type {!Array.<shaka.util.PeriodCombiner.Period>} */
     const periods = [
       {
@@ -560,6 +651,7 @@ describe('PeriodCombiner', () => {
         textStreams: [
           makeTextStream('en'),
         ],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -572,6 +664,7 @@ describe('PeriodCombiner', () => {
         textStreams: [
           /* No text streams */
         ],
+        imageStreams: [],
       },
       {
         id: '3',
@@ -585,6 +678,7 @@ describe('PeriodCombiner', () => {
           makeTextStream('en'),
           makeTextStream('es'),
         ],
+        imageStreams: [],
       },
     ];
 
@@ -608,6 +702,70 @@ describe('PeriodCombiner', () => {
     expect(english.originalId).toBe('en,,en');
   });
 
+  it('handles image track gaps', async () => {
+    /** @type {!Array.<shaka.util.PeriodCombiner.Period>} */
+    const periods = [
+      {
+        id: '1',
+        videoStreams: [
+          makeVideoStream(1080),
+        ],
+        audioStreams: [
+          makeAudioStream('en'),
+        ],
+        textStreams: [],
+        imageStreams: [
+          makeImageStream(240),
+        ],
+      },
+      {
+        id: '2',
+        videoStreams: [
+          makeVideoStream(1080),
+        ],
+        audioStreams: [
+          makeAudioStream('en'),
+        ],
+        textStreams: [],
+        imageStreams: [
+          /* No image streams in this period */
+        ],
+      },
+      {
+        id: '3',
+        videoStreams: [
+          makeVideoStream(1080),
+        ],
+        audioStreams: [
+          makeAudioStream('en'),
+        ],
+        textStreams: [],
+        imageStreams: [
+          makeImageStream(240),
+          makeImageStream(480),
+        ],
+      },
+    ];
+
+    await combiner.combinePeriods(periods, /* isDynamic= */ false);
+    const imageStreams = combiner.getImageStreams();
+    expect(imageStreams).toEqual(jasmine.arrayWithExactContents([
+      jasmine.objectContaining({
+        height: 240,
+      }),
+      jasmine.objectContaining({
+        height: 480,
+      }),
+    ]));
+
+    // We can use the originalId field to see what each track is composed of.
+
+    const i240 = imageStreams.find((s) => s.height == 240);
+    const i480 = imageStreams.find((s) => s.height == 480);
+    expect(i240.originalId).toBe('240,,240');
+    expect(i480.originalId).toBe('240,,480');
+  });
+
   it('Disjoint audio channels', async () => {
     /** @type {!Array.<shaka.util.PeriodCombiner.Period>} */
     const periods = [
@@ -620,6 +778,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 6),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -630,6 +789,7 @@ describe('PeriodCombiner', () => {
           makeAudioStream('en', /* channels= */ 2),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -666,6 +826,7 @@ describe('PeriodCombiner', () => {
           makeAudioStreamWithSampleRate(48000),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -676,6 +837,7 @@ describe('PeriodCombiner', () => {
           makeAudioStreamWithSampleRate(44100),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -712,6 +874,7 @@ describe('PeriodCombiner', () => {
           makeAudioStreamWithSampleRate(44100),
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -722,6 +885,7 @@ describe('PeriodCombiner', () => {
           makeAudioStreamWithSampleRate(48000),
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -752,6 +916,7 @@ describe('PeriodCombiner', () => {
         ],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -761,6 +926,7 @@ describe('PeriodCombiner', () => {
         ],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -805,6 +971,7 @@ describe('PeriodCombiner', () => {
           stream2,
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '1',
@@ -816,6 +983,7 @@ describe('PeriodCombiner', () => {
           stream4,
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -864,6 +1032,7 @@ describe('PeriodCombiner', () => {
           stream2,
         ],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
@@ -875,6 +1044,7 @@ describe('PeriodCombiner', () => {
           stream4,
         ],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -900,7 +1070,7 @@ describe('PeriodCombiner', () => {
   it('The number of variants stays stable after many periods ' +
       'when going between similar content and varying ads', async () => {
     // This test is based on the content from
-    // https://github.com/google/shaka-player/issues/2716
+    // https://github.com/shaka-project/shaka-player/issues/2716
     // that used to cause our period flattening logic to keep
     // creating new variants for every new period added.
     // It's ok to create a few additional varinats/streams,
@@ -999,24 +1169,28 @@ describe('PeriodCombiner', () => {
         videoStreams: [v1, v2, v3, v4, v5],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '2',
         videoStreams: [v6, v7, v8, v9, v10],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '3',
         videoStreams: [v11, v12, v13, v14, v15],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '4',
         videoStreams: [v16, v17, v18, v19, v20],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '5',
@@ -1024,6 +1198,7 @@ describe('PeriodCombiner', () => {
         videoStreams: [v1, v2, v3, v4, v5],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '6',
@@ -1031,6 +1206,7 @@ describe('PeriodCombiner', () => {
         videoStreams: [v6, v7, v8, v9, v10],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '7',
@@ -1038,6 +1214,7 @@ describe('PeriodCombiner', () => {
         videoStreams: [v11, v12, v13, v14, v15],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       {
         id: '8',
@@ -1045,6 +1222,7 @@ describe('PeriodCombiner', () => {
         videoStreams: [v16, v17, v18, v19, v20],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
       // Adding the 1st period again since it was the one that used to
       // cause trouble when repeated.
@@ -1054,6 +1232,7 @@ describe('PeriodCombiner', () => {
         videoStreams: [v1, v2, v3, v4, v5],
         audioStreams: [],
         textStreams: [],
+        imageStreams: [],
       },
     ];
 
@@ -1178,6 +1357,26 @@ describe('PeriodCombiner', () => {
         language);
     streamGenerator.primary = primary;
     streamGenerator.originalId = primary ? language + '*' : language;
+    return streamGenerator.build_();
+  }
+
+  /**
+   * @param {number} height
+   * @return {shaka.extern.Stream}
+   * @suppress {accessControls}
+   */
+  function makeImageStream(height) {
+    const width = height * 4 / 3;
+    const streamGenerator = new shaka.test.ManifestGenerator.Stream(
+        /* manifest= */ null,
+        /* isPartial= */ false,
+        /* id= */ nextId++,
+        /* type= */ shaka.util.ManifestParserUtils.ContentType.IMAGE,
+        /* lang= */ 'und');
+    streamGenerator.size(width, height);
+    streamGenerator.originalId = height.toString();
+    streamGenerator.mime('image/jpeg');
+    streamGenerator.tilesLayout = '1x1';
     return streamGenerator.build_();
   }
 

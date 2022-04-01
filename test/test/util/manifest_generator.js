@@ -107,6 +107,8 @@ shaka.test.ManifestGenerator.Manifest = class {
     this.offlineSessionIds = [];
     /** @type {number} */
     this.minBufferTime = 0;
+    /** @type {boolean} */
+    this.sequenceMode = false;
 
     /** @type {shaka.extern.Manifest} */
     const foo = this;
@@ -407,6 +409,8 @@ shaka.test.ManifestGenerator.DrmInfo = class {
     this.keyIds = new Set();
     /** @type {string} */
     this.sessionType = '';
+    /** @type {string} */
+    this.serverCertificateUri = '';
 
     /** @type {shaka.extern.DrmInfo} */
     const foo = this;
@@ -431,7 +435,7 @@ shaka.test.ManifestGenerator.DrmInfo = class {
     if (!this.initData) {
       this.initData = [];
     }
-    this.initData.push({initData: buffer, initDataType: type, keyId: null});
+    this.initData.push({initData: buffer, initDataType: type});
   }
 
   /**
@@ -604,9 +608,16 @@ shaka.test.ManifestGenerator.Stream = class {
         segmentDuration, 'Must pass a non-zero segment duration');
 
     const shaka_ = this.manifest_.shaka_;
-    const totalDuration = this.manifest_.presentationTimeline.getDuration();
+    let totalDuration = this.manifest_.presentationTimeline.getDuration();
     goog.asserts.assert(
         isFinite(totalDuration), 'Must specify a manifest duration');
+    if (!isFinite(totalDuration)) {
+      // Without this, a mistake of an infinite duration would result in an
+      // infinite loop and a crash, which would in turn prevent you from seeing
+      // the above assertion fail.
+      totalDuration = 0;
+    }
+
     const segmentCount = totalDuration / segmentDuration;
     const references = [];
 
@@ -651,15 +662,16 @@ shaka.test.ManifestGenerator.Stream = class {
    * @param {!Array.<string>} uris
    * @param {number} startByte
    * @param {?number} endByte
+   * @param {null|shaka.extern.MediaQualityInfo=} mediaQuality
    */
-  setInitSegmentReference(uris, startByte, endByte) {
+  setInitSegmentReference(uris, startByte, endByte, mediaQuality) {
     goog.asserts.assert(this.manifest_,
         'A top-level generated Manifest is required to use this method!');
 
     const getUris = () => uris;
     this.initSegmentReference_ =
         new this.manifest_.shaka_.media.InitSegmentReference(
-            getUris, startByte, endByte);
+            getUris, startByte, endByte, mediaQuality);
   }
 
   /**

@@ -28,6 +28,7 @@
 +../../lib/media/playhead.js
 +../../lib/media/playhead_observer.js
 +../../lib/media/presentation_timeline.js
++../../lib/media/quality_observer.js
 +../../lib/media/region_observer.js
 +../../lib/media/region_timeline.js
 +../../lib/media/segment_index.js
@@ -58,6 +59,7 @@
 +../../lib/util/abortable_operation.js
 +../../lib/util/array_utils.js
 +../../lib/util/buffer_utils.js
++../../lib/util/cmcd_manager.js
 +../../lib/util/config_utils.js
 +../../lib/util/data_view_reader.js
 +../../lib/util/delayed_tick.js
@@ -82,6 +84,7 @@
 +../../lib/util/mp4_box_parsers.js
 +../../lib/util/mp4_parser.js
 +../../lib/util/multi_map.js
++../../lib/util/mutex.js
 +../../lib/util/networking.js
 +../../lib/util/object_utils.js
 +../../lib/util/operation_manager.js

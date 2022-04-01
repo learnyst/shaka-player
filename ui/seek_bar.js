@@ -15,7 +15,6 @@ goog.require('shaka.ui.RangeElement');
 goog.require('shaka.ui.Utils');
 goog.require('shaka.util.Dom');
 goog.require('shaka.util.Timer');
-goog.requireType('shaka.ads.CuePoint');
 goog.requireType('shaka.ui.Controls');
 
 
@@ -83,7 +82,7 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
      */
     this.wasPlaying_ = false;
 
-    /** @private {!Array.<!shaka.ads.CuePoint>} */
+    /** @private {!Array.<!shaka.extern.AdCuePoint>} */
     this.adCuePoints_ = [];
 
     this.eventManager.listen(this.localization,
@@ -96,7 +95,9 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
 
     this.eventManager.listen(
         this.adManager, shaka.ads.AdManager.AD_STARTED, () => {
-          shaka.ui.Utils.setDisplay(this.container, false);
+          if (!this.shouldBeDisplayed_()) {
+            shaka.ui.Utils.setDisplay(this.container, false);
+          }
         });
 
     this.eventManager.listen(
@@ -367,13 +368,12 @@ shaka.ui.SeekBar = class extends shaka.ui.RangeElement {
       return false;
     }
 
-    return this.ad == null;
+    return this.ad == null || !this.ad.isLinear();
   }
 
   /** @private */
   updateAriaLabel_() {
-    this.bar.setAttribute(shaka.ui.Constants.ARIA_LABEL,
-        this.localization.resolve(shaka.ui.Locales.Ids.SEEK));
+    this.bar.ariaLabel = this.localization.resolve(shaka.ui.Locales.Ids.SEEK);
   }
 };
 

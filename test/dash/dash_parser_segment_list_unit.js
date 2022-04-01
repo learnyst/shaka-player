@@ -308,7 +308,7 @@ describe('DashParser SegmentList', () => {
     });
   });
 
-  // https://github.com/google/shaka-player/issues/3230
+  // https://github.com/shaka-project/shaka-player/issues/3230
   it('works with multi-Period with eviction', async () => {
     const setFormat = [
       '    <AdaptationSet mimeType="video/mp4">',
@@ -344,6 +344,8 @@ describe('DashParser SegmentList', () => {
 
     const playerInterface = {
       networkingEngine: networkingEngine,
+      modifyManifestRequest: (request, manifestInfo) => {},
+      modifySegmentRequest: (request, segmentInfo) => {},
       filter: () => {},
       makeTextStreamsForClosedCaptions: (manifest) => {},
       onTimelineRegionAdded: fail,  // Should not have any EventStream elements.
@@ -374,4 +376,3 @@ describe('DashParser SegmentList', () => {
     expect(actual).toEqual(expected);
   });
 });
-

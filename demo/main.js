@@ -164,7 +164,7 @@ shakaDemo.Main = class {
       case shaka.ui.Overlay.FailReasonCode.NO_BROWSER_SUPPORT:
         message = this.getLocalizedString(
             shakaDemo.MessageIds.FAILURE_NO_BROWSER_SUPPORT);
-        href = 'https://github.com/google/shaka-player#' +
+        href = 'https://github.com/shaka-project/shaka-player#' +
                 'platform-and-browser-support-matrix';
         break;
       case shaka.ui.Overlay.FailReasonCode.PLAYER_FAILED_TO_LOAD:
@@ -289,7 +289,7 @@ shakaDemo.Main = class {
 
     // Navigate to the github issue opening interface, with the
     // partially-filled template as a preset body.
-    let url = 'https://github.com/google/shaka-player/issues/new?';
+    let url = 'https://github.com/shaka-project/shaka-player/issues/new?';
     url += 'body=' + encodeURIComponent(text);
     // Open in another tab.
     window.open(url, '_blank');
@@ -726,6 +726,9 @@ shakaDemo.Main = class {
     if (asset.features.includes(shakaAssets.Feature.MP2TS)) {
       mimeTypes.push('video/mp2t');
     }
+    if (asset.features.includes(shakaAssets.Feature.CONTAINERLESS)) {
+      mimeTypes.push('audio/aac');
+    }
     const hasSupportedMimeType = mimeTypes.some((type) => {
       return this.support_.media[type];
     });
@@ -1124,6 +1127,9 @@ shakaDemo.Main = class {
     if (document.fullscreenElement) {
       document.exitFullscreen();
     }
+    if (this.video_.webkitDisplayingFullscreen) {
+      this.video_.webkitExitFullscreen();
+    }
     if (document.pictureInPictureElement) {
       document.exitPictureInPicture();
     }
@@ -1256,7 +1262,11 @@ shakaDemo.Main = class {
       if (asset.imaAssetKey || (asset.imaContentSrcId && asset.imaVideoId)) {
         manifestUri = await this.getManifestUriFromAdManager_(asset);
       }
-      await this.player_.load(manifestUri);
+      await this.player_.load(
+          manifestUri,
+          /* startTime= */ null,
+          asset.mimeType || undefined);
+
       if (this.player_.isAudioOnly()) {
         this.video_.poster = shakaDemo.Main.audioOnlyPoster_;
       }
@@ -1604,7 +1614,7 @@ shakaDemo.Main = class {
 
   /**
    * Sets the "version-string" divs to a version string.
-   * For example, "v2.5.4-master (uncompiled)".
+   * For example, "v2.5.4-main (uncompiled)".
    * @private
    */
   setUpVersionStrings_() {
@@ -1728,6 +1738,7 @@ shakaDemo.Main = class {
       audioRobustness: '',
       sessionType: '',
       serverCertificate: new Uint8Array(0),
+      serverCertificateUri: '',
       individualizationServer: '',
     };
   }
@@ -1738,7 +1749,7 @@ shakaDemo.Main = class {
 shakaDemo.Main.commonDrmSystems = [
   'com.widevine.alpha',
   'com.microsoft.playready',
-  'com.apple.fps.1_0',
+  'com.apple.fps',
   'com.adobe.primetime',
   'org.w3.clearkey',
 ];

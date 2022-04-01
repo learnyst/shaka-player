@@ -69,7 +69,8 @@ let ExtraMetadataType;
  *   textLanguages: (!Array.<string>|undefined),
  *   duration: number,
  *   licenseServers: (!Object.<string, string>|undefined),
- *   licenseRequestHeaders: (!Object.<string, string>|undefined)
+ *   licenseRequestHeaders: (!Object.<string, string>|undefined),
+ *   sequenceMode: boolean
  * }}
  */
 let MetadataType;
@@ -206,10 +207,23 @@ shaka.test.TestScheme = class {
      * @param {string} name
      */
     function addStreamInfo(stream, variant, data, contentType, name) {
+      const mediaQualityInfo = {
+        bandwidth: 1,
+        codecs: data[contentType].codecs || 'unknown',
+        contentType: contentType,
+        mimeType: data[contentType].mimeType,
+        audioSamplingRate: null,
+        frameRate: null,
+        height: null,
+        channelsCount: null,
+        pixelAspectRatio: null,
+        width: null,
+      };
       stream.mimeType = data[contentType].mimeType;
       stream.codecs = data[contentType].codecs;
       stream.setInitSegmentReference(
-          ['test:' + name + '/' + contentType + '/init'], 0, null);
+          ['test:' + name + '/' + contentType + '/init'], 0, null,
+          mediaQualityInfo);
       stream.useSegmentTemplate(
           'test:' + name + '/' + contentType + '/%d',
           data[contentType].segmentDuration);
@@ -283,6 +297,7 @@ shaka.test.TestScheme = class {
 
       const manifest = shaka.test.ManifestGenerator.generate((manifest) => {
         manifest.presentationTimeline.setDuration(data.duration);
+        manifest.sequenceMode = data.sequenceMode;
 
         const videoResolutions = data.videoResolutions || [undefined];
         const audioLanguages = data.audioLanguages ||
@@ -516,6 +531,16 @@ shaka.test.TestScheme.DATA = {
     audio: sintelAudioSegment,
     text: vttSegment,
     duration: 30,
+    sequenceMode: false,
+  },
+
+  // Like 'sintel', but flagged as sequence mode.
+  'sintel_sequence': {
+    video: sintelVideoSegment,
+    audio: sintelAudioSegment,
+    text: vttSegment,
+    duration: 30,
+    sequenceMode: true,
   },
 
   // Like 'sintel', but much longer to test buffering and seeking.
@@ -523,6 +548,7 @@ shaka.test.TestScheme.DATA = {
     video: sintelVideoSegment,
     audio: sintelAudioSegment,
     duration: 300,
+    sequenceMode: false,
   },
 
   // Like 'sintel' above, but with languages and delayed setup.
@@ -539,6 +565,7 @@ shaka.test.TestScheme.DATA = {
       language: 'fa',  // Necessary to repro #1696
     }),
     duration: 30,
+    sequenceMode: false,
   },
 
   'sintel_multi_lingual_multi_res': {
@@ -552,25 +579,29 @@ shaka.test.TestScheme.DATA = {
     audioLanguages: ['en', 'es'],
     textLanguages: ['zh', 'fr'],
     duration: 30,
+    sequenceMode: false,
   },
 
   'sintel_audio_only': {
     audio: sintelAudioSegment,
     duration: 30,
+    sequenceMode: false,
   },
 
   'sintel_no_text': {
     video: sintelVideoSegment,
     audio: sintelAudioSegment,
     duration: 30,
+    sequenceMode: false,
   },
 
-  // https://github.com/google/shaka-player/issues/2553
+  // https://github.com/shaka-project/shaka-player/issues/2553
   'forced_subs_simulation': {
     audio: sintelAudioSegment,
     text: vttSegment,
     textLanguages: ['de', 'de'],  // one of these is the "forced subs" track
     duration: 30,
+    sequenceMode: false,
   },
 
   'sintel-enc': {
@@ -579,6 +610,7 @@ shaka.test.TestScheme.DATA = {
     text: vttSegment,
     licenseServers: widevineDrmServers,
     duration: 30,
+    sequenceMode: false,
   },
 
   'multidrm': {
@@ -588,6 +620,7 @@ shaka.test.TestScheme.DATA = {
     licenseServers: axinomDrmServers,
     licenseRequestHeaders: axinomDrmHeaders,
     duration: 30,
+    sequenceMode: false,
   },
 
   'multidrm_no_init_data': {
@@ -600,6 +633,7 @@ shaka.test.TestScheme.DATA = {
     licenseServers: axinomDrmServers,
     licenseRequestHeaders: axinomDrmHeaders,
     duration: 30,
+    sequenceMode: false,
   },
 
   'cea-708_ts': {
@@ -613,6 +647,7 @@ shaka.test.TestScheme.DATA = {
       mimeType: 'application/cea-608',
     },
     duration: 30,
+    sequenceMode: false,
   },
 
   'cea-708_mp4': {
@@ -627,6 +662,7 @@ shaka.test.TestScheme.DATA = {
       closedCaptions: new Map([['CC1', 'en']]),
     },
     duration: 30,
+    sequenceMode: false,
   },
 };
 

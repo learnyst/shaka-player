@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-goog.require('shaka.test.UiUtils');
 goog.require('shaka.test.Util');
 goog.require('shaka.text.Cue');
 goog.require('shaka.text.UITextDisplayer');
@@ -51,8 +50,7 @@ describe('UITextDisplayer', () => {
       /** @type {!HTMLElement} */ (document.createElement('div'));
     videoContainer.style.height = `${videoContainerHeight}px`;
     document.body.appendChild(videoContainer);
-    video = shaka.test.UiUtils.createVideoElement();
-    videoContainer.appendChild(video);
+    video = new shaka.test.FakeVideo();
   });
 
   beforeEach(() => {
@@ -86,19 +84,16 @@ describe('UITextDisplayer', () => {
     // Wait until updateCaptions_() gets called.
     await shaka.test.Util.delay(0.5);
 
-    const textContainer =
-        videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
 
     const expectCssObj = {
       'color': 'green',
-      'background-color': 'black',
       'direction': 'ltr',
       'font-size': '10px',
       'font-style': 'normal',
       'font-weight': 400,
-      'line-height': 2,
       'text-align': 'center',
     };
 
@@ -115,6 +110,8 @@ describe('UITextDisplayer', () => {
     }
 
     expect(cssObj).toEqual(jasmine.objectContaining(expectCssObj));
+    expect(parseCssText(textContainer.querySelector('span').style.cssText))
+        .toEqual(jasmine.objectContaining({'background-color': 'black'}));
   });
 
   it('correctly displays styles for nested cues', async () => {
@@ -138,14 +135,13 @@ describe('UITextDisplayer', () => {
     await shaka.test.Util.delay(0.5);
 
     // Verify styles applied to the nested cues.
-    const textContainer =
-        videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    const captions =
+        textContainer.querySelector('span:not(.shaka-text-wrapper)');
     const cssObj = parseCssText(captions.style.cssText);
 
     const expectCssObj = {
       'color': 'green',
-      'background-color': 'black',
       'font-size': '10px',
       'font-style': 'normal',
       'font-weight': 400,
@@ -165,6 +161,8 @@ describe('UITextDisplayer', () => {
     }
 
     expect(cssObj).toEqual(jasmine.objectContaining(expectCssObj));
+    expect(parseCssText(captions.querySelector('span').style.cssText))
+        .toEqual(jasmine.objectContaining({'background-color': 'black'}));
   });
 
   it('correctly displays styles for cellResolution units', async () => {
@@ -191,9 +189,8 @@ describe('UITextDisplayer', () => {
     // style.
     const expectedLinePadding = '11.25px';
 
-    const textContainer =
-        videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
     expect(cssObj).toEqual(
         jasmine.objectContaining({
@@ -221,9 +218,8 @@ describe('UITextDisplayer', () => {
     // videoContainerHeight=450px and tts:fontSize="90%" on the default style.
     const expectedFontSize = '27px';
 
-    const textContainer =
-        videoContainer.querySelector('.shaka-text-container');
-    const captions = textContainer.querySelector('span');
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    const captions = textContainer.querySelector('div');
     const cssObj = parseCssText(captions.style.cssText);
     expect(cssObj).toEqual(
         jasmine.objectContaining({'font-size': expectedFontSize}));
@@ -315,5 +311,86 @@ describe('UITextDisplayer', () => {
     // Expect textContainer to display all three cues, since they are not truly
     // duplicates.
     expect(captions.length).toBe(3);
+  });
+
+  it('hides currently displayed cue when removed', async () => {
+    const cue = new shaka.text.Cue(0, 50, 'One');
+    textDisplayer.setTextVisibility(true);
+    textDisplayer.append([cue]);
+    video.currentTime = 10;
+    await shaka.test.Util.delay(0.5);
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+
+    let cueElements = textContainer.querySelectorAll('div');
+    expect(cueElements.length).toBe(1);
+    expect(cueElements[0].textContent).toBe('One');
+
+    textDisplayer.remove(0, 100);
+
+    cueElements = textContainer.querySelectorAll('div');
+    expect(cueElements.length).toBe(0);
+  });
+
+  it('hides and shows nested cues at appropriate times', async () => {
+    const parentCue1 = new shaka.text.Cue(0, 100, '');
+    const cue1 = new shaka.text.Cue(0, 50, 'One');
+    parentCue1.nestedCues.push(cue1);
+    const cue2 = new shaka.text.Cue(25, 75, 'Two');
+    parentCue1.nestedCues.push(cue2);
+    const cue3 = new shaka.text.Cue(50, 100, 'Three');
+    parentCue1.nestedCues.push(cue3);
+
+    const parentCue2 = new shaka.text.Cue(90, 190, '');
+    const cue4 = new shaka.text.Cue(90, 130, 'Four');
+    parentCue2.nestedCues.push(cue4);
+
+    textDisplayer.setTextVisibility(true);
+    textDisplayer.append([parentCue1, parentCue2]);
+
+    video.currentTime = 10;
+    await shaka.test.Util.delay(0.5);
+    /** @type {Element} */
+    const textContainer = videoContainer.querySelector('.shaka-text-container');
+    let parentCueElements = textContainer.querySelectorAll('div');
+
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('One');
+
+    video.currentTime = 35;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('OneTwo');
+
+    video.currentTime = 60;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('TwoThree');
+
+    video.currentTime = 85;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('Three');
+
+    video.currentTime = 95;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(2);
+    expect(parentCueElements[0].textContent).toBe('Three');
+    expect(parentCueElements[1].textContent).toBe('Four');
+
+    video.currentTime = 105;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('Four');
+
+    video.currentTime = 150;
+    await shaka.test.Util.delay(0.5);
+    parentCueElements = textContainer.querySelectorAll('div');
+    expect(parentCueElements.length).toBe(1);
+    expect(parentCueElements[0].textContent).toBe('');
   });
 });

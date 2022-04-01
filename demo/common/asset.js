@@ -75,6 +75,10 @@ const ShakaDemoAssetInfo = class {
     this.imaAssetKey = null;
     /** @type {?string} */
     this.imaContentSrcId = null;
+    /** @type {?string} */
+    this.mimeType = null;
+    /** @type {?string} */
+    this.mediaPlaylistFullMimeType = null;
 
 
     // Offline storage values.
@@ -160,11 +164,29 @@ const ShakaDemoAssetInfo = class {
   }
 
   /**
+   * @param {string} mediaPlaylistFullMimeType
+   * @return {!ShakaDemoAssetInfo}
+   */
+  setMediaPlaylistFullMimeType(mediaPlaylistFullMimeType) {
+    this.mediaPlaylistFullMimeType = mediaPlaylistFullMimeType;
+    return this;
+  }
+
+  /**
    * @param {!Object} extraConfig
    * @return {!ShakaDemoAssetInfo}
    */
   setExtraConfig(extraConfig) {
     this.extraConfig = extraConfig;
+    return this;
+  }
+
+  /**
+   * @param {string} mimeType
+   * @return {!ShakaDemoAssetInfo}
+   */
+  setMimeType(mimeType) {
+    this.mimeType = mimeType;
     return this;
   }
 
@@ -357,24 +379,31 @@ const ShakaDemoAssetInfo = class {
    */
   getConfiguration() {
     const config = /** @type {shaka.extern.PlayerConfiguration} */(
-      {drm: {advanced: {}}, manifest: {dash: {}}});
+      {drm: {advanced: {}}, manifest: {dash: {}, hls: {}}});
+
+    if (this.extraConfig) {
+      for (const key in this.extraConfig) {
+        config[key] = this.extraConfig[key];
+      }
+    }
+
+    if (this.mediaPlaylistFullMimeType) {
+      config.manifest.hls.mediaPlaylistFullMimeType =
+          this.mediaPlaylistFullMimeType;
+    }
+
     if (this.licenseServers.size) {
-      config.drm.servers = {};
+      config.drm.servers = config.drm.servers || {};
       this.licenseServers.forEach((value, key) => {
         config.drm.servers[key] = value;
       });
     }
 
     if (this.clearKeys.size) {
-      config.drm.clearKeys = {};
+      config.drm.clearKeys = config.drm.clearKeys || {};
       this.clearKeys.forEach((value, key) => {
         config.drm.clearKeys[key] = value;
       });
-    }
-    if (this.extraConfig) {
-      for (const key in this.extraConfig) {
-        config[key] = this.extraConfig[key];
-      }
     }
     return config;
   }

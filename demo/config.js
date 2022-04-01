@@ -96,6 +96,7 @@ shakaDemo.Config = class {
     this.addManifestSection_();
     this.addRetrictionsSection_('',
         shakaDemo.MessageIds.RESTRICTIONS_SECTION_HEADER);
+    this.addCmcdSection_();
   }
 
   /**
@@ -206,8 +207,14 @@ shakaDemo.Config = class {
             'manifest.dash.ignoreMaxSegmentDuration')
         .addBoolInput_(MessageIds.IGNORE_HLS_TEXT_FAILURES,
             'manifest.hls.ignoreTextStreamFailures')
-        .addBoolInput_(MessageIds.USE_FULL_SEGMENTS_FOR_START_TIME,
-            'manifest.hls.useFullSegmentsForStartTime')
+        .addBoolInput_(MessageIds.IGNORE_HLS_IMAGE_FAILURES,
+            'manifest.hls.ignoreImageStreamFailures')
+        .addTextInput_(MessageIds.DEFAULT_AUDIO_CODEC,
+            'manifest.hls.defaultAudioCodec')
+        .addTextInput_(MessageIds.DEFAULT_VIDEO_CODEC,
+            'manifest.hls.defaultVideoCodec')
+        .addBoolInput_(MessageIds.IGNORE_MANIFEST_PROGRAM_DATE_TIME,
+            'manifest.hls.ignoreManifestProgramDateTime')
         .addNumberInput_(MessageIds.AVAILABILITY_WINDOW_OVERRIDE,
             'manifest.availabilityWindowOverride',
             /* canBeDecimal= */ true,
@@ -253,9 +260,30 @@ shakaDemo.Config = class {
             /* canBeDecimal= */ true)
         .addNumberInput_(MessageIds.SWITCH_INTERVAL,
             'abr.switchInterval',
+            /* canBeDecimal= */ true)
+        .addNumberInput_(MessageIds.MIN_TOTAL_BYTES,
+            'abr.advanced.minTotalBytes')
+        .addNumberInput_(MessageIds.MIN_BYTES,
+            'abr.advanced.minBytes')
+        .addNumberInput_(MessageIds.FAST_HALF_LIFE,
+            'abr.advanced.fastHalfLife',
+            /* canBeDecimal= */ true)
+        .addNumberInput_(MessageIds.SLOW_HALF_LIFE,
+            'abr.advanced.slowHalfLife',
             /* canBeDecimal= */ true);
     this.addRetrictionsSection_('abr',
         MessageIds.ADAPTATION_RESTRICTIONS_SECTION_HEADER);
+  }
+
+  /** @private */
+  addCmcdSection_() {
+    const MessageIds = shakaDemo.MessageIds;
+    const docLink = this.resolveExternLink_('.CmcdConfiguration');
+    this.addSection_(MessageIds.CMCD_SECTION_HEADER, docLink)
+        .addBoolInput_(MessageIds.ENABLED, 'cmcd.enabled')
+        .addTextInput_(MessageIds.SESSION_ID, 'cmcd.sessionId')
+        .addTextInput_(MessageIds.CONTENT_ID, 'cmcd.contentId')
+        .addBoolInput_(MessageIds.USE_HEADERS, 'cmcd.useHeaders');
   }
 
   /**
@@ -358,8 +386,13 @@ shakaDemo.Config = class {
             'streaming.forceHTTPS')
         .addBoolInput_(MessageIds.PREFER_NATIVE_HLS,
             'streaming.preferNativeHls')
-        .addBoolInput_(MessageIds.USE_MEDIA_CAPABILITIES,
-            'useMediaCapabilities');
+        .addNumberInput_(MessageIds.UPDATE_INTERVAL_SECONDS,
+            'streaming.updateIntervalSeconds',
+            /* canBeDecimal= */ true)
+        .addBoolInput_(MessageIds.DISPATCH_ALL_EMSG_BOXES,
+            'streaming.dispatchAllEmsgBoxes')
+        .addBoolInput_(MessageIds.OBSERVE_QUALITY_CHANGES,
+            'streaming.observeQualityChanges');
 
     if (!shakaDemoMain.getNativeControlsEnabled()) {
       this.addBoolInput_(MessageIds.ALWAYS_STREAM_TEXT,
@@ -395,7 +428,8 @@ shakaDemo.Config = class {
     const docLink = this.resolveExternLink_('.PlayerConfiguration');
     this.addSection_(MessageIds.LANGUAGE_SECTION_HEADER, docLink)
         .addTextInput_(MessageIds.AUDIO_LANGUAGE, 'preferredAudioLanguage')
-        .addTextInput_(MessageIds.TEXT_LANGUAGE, 'preferredTextLanguage');
+        .addTextInput_(MessageIds.TEXT_LANGUAGE, 'preferredTextLanguage')
+        .addTextInput_(MessageIds.TEXT_ROLE, 'preferredTextRole');
     const onChange = (input) => {
       shakaDemoMain.setUILocale(input.value);
       shakaDemoMain.remakeHash();

@@ -42,6 +42,8 @@ describe('DashParser ContentProtection', () => {
 
     const playerInterface = {
       networkingEngine: netEngine,
+      modifyManifestRequest: (request, manifestInfo) => {},
+      modifySegmentRequest: (request, segmentInfo) => {},
       filter: (manifest) => Promise.resolve(),
       makeTextStreamsForClosedCaptions: (manifest) => {},
       onTimelineRegionAdded: fail,  // Should not have any EventStream elements.
@@ -808,6 +810,50 @@ describe('DashParser ContentProtection', () => {
         node: strToXml('<test></test>'),
       };
       const actual = ContentProtection.getWidevineLicenseUrl(input);
+      expect(actual).toBe('');
+    });
+  });
+
+  describe('getClearKeyLicenseUrl', () => {
+    it('valid clearkey:Laurl node', () => {
+      const input = {
+        init: null,
+        keyId: null,
+        schemeUri: '',
+        node: strToXml([
+          '<test xmlns:clearkey="http://dashif.org/guidelines/clearKey">',
+          '  <clearkey:Laurl ',
+          '     Lic_type="EME-1.0">www.example.com</clearkey:Laurl>',
+          '</test>',
+        ].join('\n')),
+      };
+      const actual = ContentProtection.getClearKeyLicenseUrl(input);
+      expect(actual).toBe('www.example.com');
+    });
+
+    it('clearkey:Laurl without license url', () => {
+      const input = {
+        init: null,
+        keyId: null,
+        schemeUri: '',
+        node: strToXml([
+          '<test xmlns:clearkey="http://dashif.org/guidelines/clearKey">',
+          '  <clearkey:Laurl Lic_type="EME-1.0"></clearkey:Laurl>',
+          '</test>',
+        ].join('\n')),
+      };
+      const actual = ContentProtection.getClearKeyLicenseUrl(input);
+      expect(actual).toBe('');
+    });
+
+    it('no clearkey:Laurl node', () => {
+      const input = {
+        init: null,
+        keyId: null,
+        schemeUri: '',
+        node: strToXml('<test></test>'),
+      };
+      const actual = ContentProtection.getClearKeyLicenseUrl(input);
       expect(actual).toBe('');
     });
   });

@@ -26,6 +26,9 @@ shaka.test.FakeAdManager = class extends shaka.util.FakeEventTarget {
   }
 
   /** @override */
+  release() {}
+
+  /** @override */
   setLocale(locale) {}
 
   /** @override */
@@ -49,6 +52,13 @@ shaka.test.FakeAdManager = class extends shaka.util.FakeEventTarget {
 
   /** @override */
   replaceServerSideAdTagParameters(adTagParameters) {}
+
+  /**
+   * @override
+   */
+  getServerSideCuePoints() {
+    return [];
+  }
 
   /** @override */
   getStats() {
@@ -75,7 +85,7 @@ shaka.test.FakeAdManager = class extends shaka.util.FakeEventTarget {
    */
   startAd(ad) {
     const event = new shaka.util.FakeEvent(shaka.ads.AdManager.AD_STARTED,
-        {'ad': ad});
+        (new Map()).set('ad', ad));
 
     this.dispatchEvent(event);
   }

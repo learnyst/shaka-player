@@ -11,6 +11,7 @@ const Jimp = require('jimp');
 const fs = require('fs');
 const path = require('path');
 const rimraf = require('rimraf');
+const {ssim} = require('ssim.js');
 const util = require('karma/common/util');
 const which = require('which');
 
@@ -86,7 +87,7 @@ module.exports = (config) => {
       //   Promise polyfill, required since we test uncompiled code on IE11
       'node_modules/es6-promise-polyfill/promise.js',
       //   Babel polyfill, required for async/await
-      'node_modules/babel-polyfill/dist/polyfill.js',
+      'node_modules/@babel/polyfill/dist/polyfill.js',
       //   TextDecoder polyfill, required for TextDecoder/TextEncoder on IE and
       //   legacy Edge
       //   eslint-disable-next-line max-len
@@ -135,16 +136,18 @@ module.exports = (config) => {
       {pattern: 'ui/**/*.js', included: false},
       {pattern: 'ui/**/*.less', included: false},
       {pattern: 'third_party/**/*.js', included: false},
-      {
-        pattern: 'node_modules/google-closure-library/closure/goog/**/*.js',
-        included: false,
-      },
       {pattern: 'test/test/assets/*', included: false},
+      {pattern: 'test/test/assets/3675/*', included: false},
       {pattern: 'dist/shaka-player.ui.js', included: false},
       {pattern: 'dist/locales.js', included: false},
       {pattern: 'demo/locales/en.json', included: false},
       {pattern: 'demo/locales/source.json', included: false},
-      {pattern: 'node_modules/**/*.js', included: false},
+      {pattern: 'node_modules/sprintf-js/src/sprintf.js', included: false},
+      {pattern: 'node_modules/less/dist/less.js', included: false},
+      {
+        pattern: 'node_modules/fontfaceonload/dist/fontfaceonload.js',
+        included: false,
+      },
     ],
 
     // NOTE: Do not use proxies at all!  They cannot be used with the --hostname
@@ -258,7 +261,7 @@ module.exports = (config) => {
 
       babelPreprocessor: {
         options: {
-          presets: ['env'],
+          presets: ['@babel/preset-env'],
           // Add source maps so that backtraces refer to the original code.
           // Babel will output inline source maps, and the 'sourcemap'
           // preprocessor will read them and feed them to Karma.  Karma will
@@ -334,6 +337,10 @@ module.exports = (config) => {
   }
 
   config.set({reporters: reporters});
+
+  if (reporters.includes('spec') && settings.spec_hide_passed) {
+    config.set({specReporter: {suppressPassed: true}});
+  }
 
   if (settings.random) {
     // If --seed was specified use that value, else generate a seed so that the
@@ -517,8 +524,7 @@ function WebDriverScreenshotMiddlewareFactory(launcher) {
    *
    * @param {karma.Launcher.Browser} browser
    * @param {!Object.<string, string>} params
-   * @return {!Promise.<number>} The number of pixels changed between the old
-   *   and new screenshots, after cropping and scaling.
+   * @return {!Promise.<number>} A similarity score between 0 and 1.
    */
   async function diffScreenshot(browser, params) {
     const webDriverClient = getWebDriverClient(browser);
@@ -603,22 +609,22 @@ function WebDriverScreenshotMiddlewareFactory(launcher) {
     // Compare the new screenshot to the old one and produce a diff image.
     // Initially, the image data will be raw pixels, 4 bytes per pixel.
     // The threshold parameter affects the sensitivity of individual pixel
-    // comparisons.  Setting it too low means small rendering changes in the
-    // browser can cause failures even when a human can't see the difference,
-    // and setting it too high means human-noticeable changes could go
-    // undetected by a test.
-    const diff = Jimp.diff(oldScreenshot, newScreenshot, /* threshold= */ 0.07);
+    // comparisons.  This diff is only used for visual review, not for
+    // automated similarity checks, so the threshold setting is not so critical
+    // as it used to be.
+    const threshold = 0.10;
+    const diff = Jimp.diff(oldScreenshot, newScreenshot, threshold);
 
     // Write the diff to disk.  This is used to review when there are changes.
+    const fullSizeDiff =
+        diff.image.clone().resize(width, height, Jimp.RESIZE_BICUBIC);
     fs.writeFileSync(
-        diffScreenshotPath, await diff.image.getBufferAsync('image/png'));
+        diffScreenshotPath, await fullSizeDiff.getBufferAsync('image/png'));
 
-    // "percent" is, surprisingly, a number between 0 and 1, not between 0 and
-    // 100.  Convert this to a number of pixels changed, which has been found to
-    // be a more effective and less flaky metric.
-    const pixelsChanged =
-        diff.percent * diff.image.bitmap.width * diff.image.bitmap.height;
-    return pixelsChanged;
+    // Compare with a structural similarity algorithm.  This produces a
+    // similarity score that we will use to pass or fail the test.
+    const ssimResult = ssim(oldScreenshot.bitmap, newScreenshot.bitmap);
+    return ssimResult.mssim;  // A score between 0 and 1.
   }
 
   /**

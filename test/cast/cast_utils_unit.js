@@ -27,6 +27,7 @@ describe('CastUtils', () => {
       'getAdManager',  // Handled specially
       'getSharedConfiguration',  // Handled specially
       'getNetworkingEngine',  // Handled specially
+      'getDrmEngine',  // Handled specially
       'getMediaElement',  // Handled specially
       'setMaxHardwareResolution',
       'destroy',  // Should use CastProxy.destroy instead
@@ -122,7 +123,7 @@ describe('CastUtils', () => {
       expect(typeof deserialized).toBe('object');
 
       // The object can be used to construct a FakeEvent.
-      const fakeEvent = new FakeEvent(deserialized['type'], deserialized);
+      const fakeEvent = FakeEvent.fromRealEvent(deserialized);
 
       // The fake event has the same type and properties as the original.
       const asObj = /** @type {!Object} */ (fakeEvent);

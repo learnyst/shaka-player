@@ -58,6 +58,10 @@ shakaAssets.AdTag = {
     'single_ad_samples&ciu_szs=300x250&impl=s&gdfp_req=1&env=vp&output=vast&' +
     'unviewed_position_start=1&cust_params=deployment%3Ddevsite%26sample_ct%' +
     '3Dlinear&correlator=',
+  SINGLE_NON_LINEAR_AD: 'https://pubads.g.doubleclick.net/gampad/ads?' +
+    'sz=480x70&iu=/124319096/external/single_ad_samples&ciu_szs=300x250 ' +
+    '&impl=s&gdfp_req=1&env=vp&output=vast&unviewed_position_start=1' +
+    '&cust_params=deployment%3Ddevsite%26sample_ct%3Dnonlinear&correlator=',
   SINGLE_SKIPPABLE_AD: 'https://pubads.g.doubleclick.net/gampad/ads?sz=640x480&iu=/' +
     '124319096/external/single_ad_samples&ciu_szs=300x250&impl=s&' +
     'gdfp_req=1&env=vp&output=vast&unviewed_position_start=1&cust_params=' +
@@ -119,6 +123,8 @@ shakaAssets.Feature = {
   MP4: shakaDemo.MessageIds.MP4,
   // Set if the asset has at least one MPEG-2 TS stream.
   MP2TS: shakaDemo.MessageIds.MP2TS,
+  // Set if the asset has at least one containerless stream (AAC, etc).
+  CONTAINERLESS: shakaDemo.MessageIds.CONTAINERLESS,
 
   // Set if the asset has at least one stream that is at least 720p.
   HIGH_DEFINITION: shakaDemo.MessageIds.HIGH_DEFINITION,
@@ -289,6 +295,15 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.SURROUND)
       .addFeature(shakaAssets.Feature.OFFLINE),
   new ShakaDemoAssetInfo(
+      /* name= */ 'Angel One (HLS, MP4, video media playlist only)',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/angel_one.png',
+      /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/playlist_v-0480p-1000k-libx264.mp4.m3u8',
+      /* source= */ shakaAssets.Source.SHAKA)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.MP4)
+      .addFeature(shakaAssets.Feature.OFFLINE)
+      .setMediaPlaylistFullMimeType('video/mp4; codecs="avc1.4d401f"'),
+  new ShakaDemoAssetInfo(
       /* name= */ 'Angel One (HLS, MP4, multilingual, Widevine)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/angel_one.png',
       /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/angel-one-widevine-hls/hls.m3u8',
@@ -308,6 +323,20 @@ shakaAssets.testAssets = [
       /* source= */ shakaAssets.Source.SHAKA)
       .addKeySystem(shakaAssets.KeySystem.WIDEVINE)
       .setAdTagUri(shakaAssets.AdTag.SINGLE_LINEAR_AD)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.MP4)
+      .addFeature(shakaAssets.Feature.MULTIPLE_LANGUAGES)
+      .addFeature(shakaAssets.Feature.SUBTITLES)
+      .addFeature(shakaAssets.Feature.SURROUND)
+      .addFeature(shakaAssets.Feature.OFFLINE)
+      .addLicenseServer('com.widevine.alpha', 'https://cwip-shaka-proxy.appspot.com/no_auth'),
+  new ShakaDemoAssetInfo(
+      /* name= */ 'Angel One (HLS, MP4, multilingual, Widevine, single non-linear ad)',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/angel_one.png',
+      /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/angel-one-widevine-hls/hls.m3u8',
+      /* source= */ shakaAssets.Source.SHAKA)
+      .addKeySystem(shakaAssets.KeySystem.WIDEVINE)
+      .setAdTagUri(shakaAssets.AdTag.SINGLE_NON_LINEAR_AD)
       .addFeature(shakaAssets.Feature.HLS)
       .addFeature(shakaAssets.Feature.MP4)
       .addFeature(shakaAssets.Feature.MULTIPLE_LANGUAGES)
@@ -370,7 +399,16 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.SUBTITLES)
       .addFeature(shakaAssets.Feature.WEBM)
       .addFeature(shakaAssets.Feature.OFFLINE)
-      .addLicenseServer('com.widevine.alpha', 'https://cwip-shaka-proxy.appspot.com/no_auth'),
+      .addLicenseServer('com.widevine.alpha', 'https://cwip-shaka-proxy.appspot.com/no_auth')
+      .setExtraConfig({
+        drm: {
+          advanced: {
+            'com.widevine.alpha': {
+              serverCertificateUri: 'https://cwip-shaka-proxy.appspot.com/service-cert',
+            },
+          },
+        },
+      }),
   new ShakaDemoAssetInfo(
       /* name= */ 'Sintel 4k (multicodec, Widevine, ads)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/sintel.png',
@@ -490,7 +528,7 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.MP4)
       .addFeature(shakaAssets.Feature.SUBTITLES)
       .addFeature(shakaAssets.Feature.LIVE)
-      .setIMAAssetKey('_lDu24IaSYaYAMEfixipNQ'),
+      .setIMAAssetKey('PSzZMzAkSXCmlJOWDmRj8Q'),
   new ShakaDemoAssetInfo(
       /* name= */ 'Tears of Steel (multicodec, surround + stereo)',
       /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/tears_of_steel.png',
@@ -1161,6 +1199,24 @@ shakaAssets.testAssets = [
       .addFeature(shakaAssets.Feature.HLS)
       .addFeature(shakaAssets.Feature.LIVE)
       .addFeature(shakaAssets.Feature.MP4),
+  new ShakaDemoAssetInfo(
+      /* name= */ 'Audio only HLS with raw AAC',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/apple_test_pattern.png',
+      /* manifestUri= */ 'https://storage.googleapis.com/shaka-demo-assets/raw-hls-audio-only/manifest.m3u8',
+      /* source= */ shakaAssets.Source.APPLE)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.CONTAINERLESS)
+      .addFeature(shakaAssets.Feature.AUDIO_ONLY),
+  new ShakaDemoAssetInfo(
+      /* name= */ 'Apple Advanced HLS Stream (TS) with raw AAC',
+      /* iconUri= */ 'https://storage.googleapis.com/shaka-asset-icons/apple_test_pattern.png',
+      /* manifestUri= */ 'https://devstreaming-cdn.apple.com/videos/streaming/examples/img_bipbop_adv_example_ts/master.m3u8',
+      /* source= */ shakaAssets.Source.APPLE)
+      .addFeature(shakaAssets.Feature.HLS)
+      .addFeature(shakaAssets.Feature.MP2TS)
+      .addFeature(shakaAssets.Feature.CONTAINERLESS)
+      .addFeature(shakaAssets.Feature.HIGH_DEFINITION)
+      .addFeature(shakaAssets.Feature.OFFLINE),
   // }}}
 
   // IRT assets {{{

@@ -97,6 +97,9 @@ describe('StreamingEngine', () => {
   /** @type {!shaka.media.StreamingEngine} */
   let streamingEngine;
 
+  /** @type {function(function(), number)} */
+  let realSetTimeout;
+
   /**
    * Runs the fake event loop.
    * @param {function()=} callback An optional callback that is executed
@@ -116,6 +119,7 @@ describe('StreamingEngine', () => {
   }
 
   beforeAll(() => {
+    realSetTimeout = window.setTimeout;
     jasmine.clock().install();
     jasmine.clock().mockDate();
   });
@@ -451,6 +455,7 @@ describe('StreamingEngine', () => {
         presentationTimeInSeconds != undefined,
         'All tests should have defined an initial presentation time by now!');
     const playerInterface = {
+      modifySegmentRequest: (request, segmentInfo) => {},
       getPresentationTime: () => presentationTimeInSeconds,
       getBandwidthEstimate: Util.spyFunc(getBandwidthEstimate),
       mediaSourceEngine: mediaSourceEngine,
@@ -459,6 +464,7 @@ describe('StreamingEngine', () => {
       onEvent: Util.spyFunc(onEvent),
       onManifestUpdate: Util.spyFunc(onManifestUpdate),
       onSegmentAppended: Util.spyFunc(onSegmentAppended),
+      onInitSegmentAppended: () => {},
     };
     streamingEngine = new shaka.media.StreamingEngine(
         /** @type {shaka.extern.Manifest} */(manifest), playerInterface);
@@ -514,7 +520,8 @@ describe('StreamingEngine', () => {
     expectedMseInit.set(ContentType.VIDEO, videoStream);
     expectedMseInit.set(ContentType.TEXT, textStream);
 
-    expect(mediaSourceEngine.init).toHaveBeenCalledWith(expectedMseInit, false);
+    expect(mediaSourceEngine.init).toHaveBeenCalledWith(expectedMseInit,
+        /** forceTransmuxTS= */ false, /** sequenceMode= */ false);
     expect(mediaSourceEngine.init).toHaveBeenCalledTimes(1);
 
     expect(mediaSourceEngine.setDuration).toHaveBeenCalledTimes(1);
@@ -751,7 +758,7 @@ describe('StreamingEngine', () => {
     expect(timeline.setDuration).toHaveBeenCalledWith(35);
   });
 
-  // https://github.com/google/shaka-player/issues/979
+  // https://github.com/shaka-project/shaka-player/issues/979
   it('does not expand the timeline duration', async () => {
     setupVod();
     mediaSourceEngine = new shaka.test.FakeMediaSourceEngine(segmentData);
@@ -777,7 +784,7 @@ describe('StreamingEngine', () => {
     expect(timeline.setDuration).not.toHaveBeenCalled();
   });
 
-  // https://github.com/google/shaka-player/issues/1967
+  // https://github.com/shaka-project/shaka-player/issues/1967
   it('does not change duration when 0', async () => {
     setupVod();
     mediaSourceEngine = new shaka.test.FakeMediaSourceEngine(segmentData);
@@ -819,7 +826,54 @@ describe('StreamingEngine', () => {
       asymmetricMatch: (val) => val > 40 && val <= 40.1,
     };
     expect(mediaSourceEngine.setStreamProperties)
-        .toHaveBeenCalledWith('video', 0, lt20, gt40);
+        .toHaveBeenCalledWith('video', 0, lt20, gt40, false);
+  });
+
+  // Regression test for https://github.com/shaka-project/shaka-player/issues/3717
+  it('applies fudge factors for the duration', async () => {
+    setupVod();
+
+    // In #3717, the duration was just barely large enough to encompass an
+    // additional segment, but that segment didn't exist, so playback never
+    // completed.  Here, we set the duration to just beyond the 3rd segment, and
+    // we make the 4th segment fail when requested.
+    const duration = 30.000000005;
+    timeline.getDuration.and.returnValue(duration);
+
+    const targetUri = '1_video_3';  // The URI of the 4th video segment.
+    failRequestsForTarget(netEngine, targetUri);
+
+    mediaSourceEngine = new shaka.test.FakeMediaSourceEngine(segmentData);
+    createStreamingEngine();
+
+    // Here we go!
+    streamingEngine.switchVariant(variant);
+    streamingEngine.switchTextStream(textStream);
+    await streamingEngine.start();
+    playing = true;
+    await runTest();
+
+    // The end of the stream should have been reached, and the 4th segment from
+    // each type should never have been requested.
+    expect(mediaSourceEngine.endOfStream).toHaveBeenCalled();
+
+    const segmentType = shaka.net.NetworkingEngine.RequestType.SEGMENT;
+
+    netEngine.expectRequest('0_audio_0', segmentType);
+    netEngine.expectRequest('0_video_0', segmentType);
+    netEngine.expectRequest('0_text_0', segmentType);
+
+    netEngine.expectRequest('0_audio_1', segmentType);
+    netEngine.expectRequest('0_video_1', segmentType);
+    netEngine.expectRequest('0_text_1', segmentType);
+
+    netEngine.expectRequest('1_audio_2', segmentType);
+    netEngine.expectRequest('1_video_2', segmentType);
+    netEngine.expectRequest('1_text_2', segmentType);
+
+    netEngine.expectNoRequest('1_audio_3', segmentType);
+    netEngine.expectNoRequest('1_video_3', segmentType);
+    netEngine.expectNoRequest('1_text_3', segmentType);
   });
 
   it('does not buffer one media type ahead of another', async () => {
@@ -835,7 +889,7 @@ describe('StreamingEngine', () => {
     // This would let some media types buffer faster than others if unchecked.
     netEngineDelays.text = 0.1;
     netEngineDelays.audio = 1.0;
-    netEngineDelays.video = 10.0;
+    netEngineDelays.video = 5.0; // Need init segment and media segment
 
     mediaSourceEngine.appendBuffer.and.callFake((type, data, start, end) => {
       // Call to the underlying implementation.
@@ -878,7 +932,7 @@ describe('StreamingEngine', () => {
     expect(mediaSourceEngine.appendBuffer).toHaveBeenCalled();
   });
 
-  // https://github.com/google/shaka-player/issues/2957
+  // https://github.com/shaka-project/shaka-player/issues/2957
   it('plays with fewer text segments', async () => {
     setupVod();
 
@@ -1040,7 +1094,7 @@ describe('StreamingEngine', () => {
       expect(mediaSourceEngine.resetCaptionParser).not.toHaveBeenCalled();
     });
 
-    // See https://github.com/google/shaka-player/issues/2956
+    // See https://github.com/shaka-project/shaka-player/issues/2956
     it('works with fast variant switches during update', async () => {
       // Delay the appendBuffer call until later so we are waiting for this to
       // finish when we switch.
@@ -1389,6 +1443,66 @@ describe('StreamingEngine', () => {
       });
     });
 
+    it('into unbuffered regions when nothing is buffered ' +
+      'and mediaState is performing an update', async () => {
+      // Here we go!
+      streamingEngine.switchVariant(variant);
+      streamingEngine.switchTextStream(textStream);
+      // ensure init source buffer promise does not resolve before seeked()
+      // so mediaState remains in "performingUpdate" state
+      const initSourceBufferPromise = new shaka.util.PublicPromise();
+      mediaSourceEngine.setStreamProperties.and
+          .returnValue(initSourceBufferPromise);
+      await streamingEngine.start();
+      playing = true;
+
+      // tick to trigger mediaState updates
+      jasmine.clock().tick(1);
+      // give a chance for fetchAndAppend_ to be invoked
+      // by async onUpdate_ callback
+      await Util.shortDelay(realSetTimeout);
+
+      // Nothing is buffered yet.
+      expect(mediaSourceEngine.segments).toEqual({
+        audio: [false, false, false, false],
+        video: [false, false, false, false],
+        text: [false, false, false, false],
+      });
+
+      // Seek forward to an unbuffered region in the first Period.
+      presentationTimeInSeconds = 15;
+      streamingEngine.seeked();
+
+      // resolve initSourceBufferPromise after seeked(), waitingToClearBuffer
+      // should have been set, so this will now trigger the actual flush of
+      // the buffer
+      initSourceBufferPromise.resolve();
+      mediaSourceEngine.setStreamProperties.and
+          .returnValue(Promise.resolve());
+
+      // allow mediaState update to resolve
+      await Util.shortDelay(realSetTimeout);
+
+      onTick.and.callFake(() => {
+        expect(mediaSourceEngine.clear).toHaveBeenCalled();
+        onTick.and.stub();
+      });
+
+      await runTest(Util.spyFunc(onTick));
+
+      // Verify buffers.
+      expect(mediaSourceEngine.initSegments).toEqual({
+        audio: [false, true],
+        video: [false, true],
+        text: [],
+      });
+      expect(mediaSourceEngine.segments).toEqual({
+        audio: [false, true, true, true],
+        video: [false, true, true, true],
+        text: [false, true, true, true],
+      });
+    });
+
     it('into unbuffered regions near segment start', async () => {
       // Here we go!
       streamingEngine.switchVariant(variant);
@@ -1548,7 +1662,7 @@ describe('StreamingEngine', () => {
       });
     });
 
-    // https://github.com/google/shaka-player/issues/2670
+    // https://github.com/shaka-project/shaka-player/issues/2670
     it('rapid unbuffered seeks', async () => {
       // This test simulates rapid dragging of the seek bar, as in #2670.
       // In that issue, we would buffer the wrong segments due to a race
@@ -2170,13 +2284,13 @@ describe('StreamingEngine', () => {
               .bind(mediaSourceEngine);
 
       mediaSourceEngine.remove.and.callFake((type, start, end) => {
-        expect(presentationTimeInSeconds).toBe(20);
+        expect(presentationTimeInSeconds).toBeGreaterThanOrEqual(20);
         expect(start).toBe(0);
         expect(end).toBe(10);
 
         if (mediaSourceEngine.remove.calls.count() == 3) {
           mediaSourceEngine.remove.and.callFake((type, start, end) => {
-            expect(presentationTimeInSeconds).toBe(30);
+            expect(presentationTimeInSeconds).toBeGreaterThanOrEqual(30);
             expect(start).toBe(10);
             expect(end).toBe(20);
             return originalRemove(type, start, end);
@@ -3386,6 +3500,40 @@ describe('StreamingEngine', () => {
   function slideSegmentAvailabilityWindow() {
     segmentAvailability.start++;
     segmentAvailability.end++;
+  }
+
+  /**
+   * @param {!shaka.test.FakeNetworkingEngine} netEngine A NetworkingEngine
+   *   look-alike.
+   * @param {string} targetUri
+   * @param {shaka.util.Error.Code=} errorCode
+   */
+  function failRequestsForTarget(
+      netEngine, targetUri, errorCode=shaka.util.Error.Code.BAD_HTTP_STATUS) {
+    // eslint-disable-next-line no-restricted-syntax
+    const originalNetEngineRequest = netEngine.request.bind(netEngine);
+
+    netEngine.request = jasmine.createSpy('request').and.callFake(
+        (requestType, request) => {
+          if (request.uris[0] == targetUri) {
+            const data = [targetUri];
+
+            if (errorCode == shaka.util.Error.Code.BAD_HTTP_STATUS) {
+              data.push(404);
+              data.push('');
+            }
+
+            // The compiler still sees the error code parameter as potentially
+            // undefined, even though we gave it a default value.
+            goog.asserts.assert(errorCode != undefined, 'Undefined error code');
+
+            return shaka.util.AbortableOperation.failed(new shaka.util.Error(
+                shaka.util.Error.Severity.CRITICAL,
+                shaka.util.Error.Category.NETWORK,
+                errorCode, data));
+          }
+          return originalNetEngineRequest(requestType, request);
+        });
   }
 
   /**
