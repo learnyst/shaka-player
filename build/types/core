@@ -68,7 +68,6 @@
 +../../lib/util/ebml_parser.js
 +../../lib/util/error.js
 +../../lib/util/event_manager.js
-+../../lib/util/fairplay_utils.js
 +../../lib/util/fake_event.js
 +../../lib/util/fake_event_target.js
 +../../lib/util/functional.js
@@ -84,7 +83,6 @@
 +../../lib/util/mp4_box_parsers.js
 +../../lib/util/mp4_parser.js
 +../../lib/util/multi_map.js
-+../../lib/util/mutex.js
 +../../lib/util/networking.js
 +../../lib/util/object_utils.js
 +../../lib/util/operation_manager.js

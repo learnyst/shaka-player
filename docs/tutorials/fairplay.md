@@ -1,7 +1,40 @@
 # FairPlay Support
 
 We support FairPlay with EME on compatible environments or native `src=`.
+
+By default Shaka Player supports Modern EME, if your provider doesn't support
+Modern EME yet, you can use legacy Apple Media Keys with:
+```js
+shaka.polyfill.PatchedMediaKeysApple.install();
+```
+
+The support in each case would be the following:
+
+|            |Modern EME |legacy Apple Media Keys|
+|:----------:|:---------:|:---------------------:|
+|src= (CMAF) |**Y**      |**Y**                  |
+|src= (TS)   |**Y**      |**Y**                  |
+|MSE (CMAF)  |**Y**      | -                     |
+|MSE (TS)    | -         | -                     |
+
+
 Adding FairPlay support involves a bit more work than other key systems.
+
+
+## Keysystem used in EME
+
+Depending on the EME implementation that is being used, the Fairplay keysystem
+varies.
+
+For Modern EME:
+```
+com.apple.fps
+```
+
+For legacy Apple Media Keys:
+```
+com.apple.fps.1_0
+```
 
 ## Server certificate
 
@@ -24,7 +57,8 @@ player.configure('drm.advanced.com\\.apple\\.fps\\.serverCertificateUri',
 
 ## Content ID
 
-Note: This only applies when legacy Apple Media Keys is used.
+Note: Normally only applies to legacy Apple Media Keys but some providers also
+need it in Modern EME.
 
 Some FairPlay content use custom signaling for the content ID.  The content ID
 is used by the browser to generate the license request.  If you don't use the
@@ -34,7 +68,6 @@ default content ID derivation, you need to specify a custom init data transform:
 player.configure('drm.initDataTransform', (initData, initDataType) => {
   if (initDataType != 'skd')
     return initData;
-
   // 'initData' is a buffer containing an 'skd://' URL as a UTF-8 string.
   const skdUri = shaka.util.StringUtils.fromBytesAutoDetect(initData);
   const contentId = getMyContentId(skdUri);
@@ -81,4 +114,99 @@ player.getNetworkingEngine().registerResponseFilter((type, response) => {
   // Decode the base64-encoded data into the format the browser expects.
   response.data = shaka.util.Uint8ArrayUtils.fromBase64(responseText).buffer;
 });
+```
+
+### Integration with some DRMs providers
+
+Note: Some providers support both Modern EME and legacy Apple Media Keys.
+
+#### EZDRM (Modern EME)
+
+For integration with EZDRM the following can be used:
+
+```js
+const FairPlayUtils = shaka.util.FairPlayUtils;
+player.getNetworkingEngine()
+    .registerRequestFilter(FairPlayUtils.ezdrmFairPlayRequest);
+player.getNetworkingEngine()
+    .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
+```
+
+Note: If the url of the license server has to undergo any transformation
+(eg: add the contentId), you would have to create your filter manually.
+
+```js
+player.getNetworkingEngine().registerRequestFilter((type, request) => {
+  if (type != shaka.net.NetworkingEngine.RequestType.LICENSE) {
+    return;
+  }
+  const uri = request.uris[0];
+  const FairPlayUtils = shaka.util.FairPlayUtils;
+  const contentId = FairPlayUtils.defaultGetContentId(request.initData);
+  const newUri = uri.replace('^assetId^', contentId);
+  request.uris = [newUri];
+  request.headers['Content-Type'] = 'application/octet-stream'
+});
+```
+
+#### EZDRM (legacy Apple Media Keys)
+
+For integration with EZDRM the following can be used:
+
+```js
+shaka.polyfill.PatchedMediaKeysApple.install();
+const FairPlayUtils = shaka.util.FairPlayUtils;
+player.getNetworkingEngine()
+    .registerRequestFilter(FairPlayUtils.ezdrmFairPlayRequest);
+player.getNetworkingEngine()
+    .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
+player.configure('drm.initDataTransform',
+                 FairPlayUtils.ezdrmInitDataTransform);
+```
+
+Note: If the url of the license server has to undergo any transformation
+(eg: add the contentId), you would have to create your filter manually.
+
+```js
+player.getNetworkingEngine().registerRequestFilter((type, request) => {
+  if (type != shaka.net.NetworkingEngine.RequestType.LICENSE) {
+    return;
+  }
+  const uri = request.uris[0];
+  const FairPlayUtils = shaka.util.FairPlayUtils;
+  const contentId = FairPlayUtils.defaultGetContentId(request.initData);
+  const newUri = uri.replace('^assetId^', contentId);
+  request.uris = [newUri];
+  request.headers['Content-Type'] = 'application/octet-stream'
+});
+```
+
+#### Verimatrix (legacy Apple Media Keys)
+
+For integration with Verimatrix the following can be used:
+
+```js
+shaka.polyfill.PatchedMediaKeysApple.install();
+const FairPlayUtils = shaka.util.FairPlayUtils;
+player.getNetworkingEngine()
+    .registerRequestFilter(FairPlayUtils.verimatrixFairPlayRequest);
+player.getNetworkingEngine()
+    .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
+player.configure('drm.initDataTransform',
+                 FairPlayUtils.verimatrixInitDataTransform);
+```
+
+#### Conax (legacy Apple Media Keys)
+
+For integration with Conax the following can be used:
+
+```js
+shaka.polyfill.PatchedMediaKeysApple.install();
+const FairPlayUtils = shaka.util.FairPlayUtils;
+player.getNetworkingEngine()
+    .registerRequestFilter(FairPlayUtils.conaxFairPlayRequest);
+player.getNetworkingEngine()
+    .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
+player.configure('drm.initDataTransform',
+                 FairPlayUtils.conaxInitDataTransform);
 ```

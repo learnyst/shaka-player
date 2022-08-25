@@ -11,7 +11,6 @@ goog.require('goog.asserts');
 goog.require('shakaDemo.BoolInput');
 goog.require('shakaDemo.DatalistInput');
 goog.require('shakaDemo.InputContainer');
-goog.require('shakaDemo.Main');
 goog.require('shakaDemo.MessageIds');
 goog.require('shakaDemo.NumberInput');
 goog.require('shakaDemo.SelectInput');
@@ -237,7 +236,9 @@ shakaDemo.Config = class {
         .addBoolInput_(MessageIds.DISABLE_TEXT,
             'manifest.disableText')
         .addBoolInput_(MessageIds.DISABLE_THUMBNAILS,
-            'manifest.disableThumbnails');
+            'manifest.disableThumbnails')
+        .addBoolInput_(MessageIds.SEGMENT_RELATIVE_VTT_TIMING,
+            'manifest.segmentRelativeVttTiming');
 
     this.addRetrySection_('manifest', MessageIds.MANIFEST_RETRY_SECTION_HEADER);
   }
@@ -270,7 +271,11 @@ shakaDemo.Config = class {
             /* canBeDecimal= */ true)
         .addNumberInput_(MessageIds.SLOW_HALF_LIFE,
             'abr.advanced.slowHalfLife',
-            /* canBeDecimal= */ true);
+            /* canBeDecimal= */ true)
+        .addBoolInput_(MessageIds.RESTRICT_TO_ELEMENT_SIZE,
+            'abr.restrictToElementSize')
+        .addBoolInput_(MessageIds.IGNORE_DEVICE_PIXEL_RATIO,
+            'abr.ignoreDevicePixelRatio');
     this.addRetrictionsSection_('abr',
         MessageIds.ADAPTATION_RESTRICTIONS_SECTION_HEADER);
   }
@@ -340,7 +345,9 @@ shakaDemo.Config = class {
     const docLink = this.resolveExternLink_('.OfflineConfiguration');
     this.addSection_(MessageIds.OFFLINE_SECTION_HEADER, docLink)
         .addBoolInput_(MessageIds.USE_PERSISTENT_LICENSES,
-            'offline.usePersistentLicense');
+            'offline.usePersistentLicense')
+        .addNumberInput_(MessageIds.NUMBER_OF_PARALLEL_DOWNLOADS,
+            'offline.numberOfParallelDownloads');
   }
 
   /** @private */
@@ -350,9 +357,6 @@ shakaDemo.Config = class {
     this.addSection_(MessageIds.STREAMING_SECTION_HEADER, docLink)
         .addNumberInput_(MessageIds.GAP_DETECTION_THRESHOLD,
             'streaming.gapDetectionThreshold',
-            /* canBeDecimal= */ true)
-        .addNumberInput_(MessageIds.MAX_SMALL_GAP_SIZE,
-            'streaming.smallGapLimit',
             /* canBeDecimal= */ true)
         .addNumberInput_(MessageIds.BUFFERING_GOAL,
             'streaming.bufferingGoal',
@@ -392,7 +396,9 @@ shakaDemo.Config = class {
         .addBoolInput_(MessageIds.DISPATCH_ALL_EMSG_BOXES,
             'streaming.dispatchAllEmsgBoxes')
         .addBoolInput_(MessageIds.OBSERVE_QUALITY_CHANGES,
-            'streaming.observeQualityChanges');
+            'streaming.observeQualityChanges')
+        .addNumberInput_(MessageIds.MAX_DISABLED_TIME,
+            'streaming.maxDisabledTime');
 
     if (!shakaDemoMain.getNativeControlsEnabled()) {
       this.addBoolInput_(MessageIds.ALWAYS_STREAM_TEXT,
@@ -406,10 +412,8 @@ shakaDemo.Config = class {
       this.latestInput_.input().checked = true;
     }
 
-    this.addBoolInput_(MessageIds.JUMP_LARGE_GAPS,
-        'streaming.jumpLargeGaps')
-        .addBoolInput_(MessageIds.FORCE_TRANSMUX_TS,
-            'streaming.forceTransmuxTS')
+    this.addBoolInput_(MessageIds.FORCE_TRANSMUX_TS,
+        'streaming.forceTransmuxTS')
         .addBoolInput_(MessageIds.START_AT_SEGMENT_BOUNDARY,
             'streaming.startAtSegmentBoundary')
         .addBoolInput_(MessageIds.IGNORE_TEXT_FAILURES,

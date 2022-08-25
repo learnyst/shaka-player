@@ -4,21 +4,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-goog.require('shaka.media.DrmEngine');
-goog.require('shaka.media.MediaSourceEngine');
-goog.require('shaka.net.NetworkingEngine');
-goog.require('shaka.test.FakeClosedCaptionParser');
-goog.require('shaka.test.FakeTextDisplayer');
-goog.require('shaka.test.ManifestGenerator');
-goog.require('shaka.test.UiUtils');
-goog.require('shaka.test.Util');
-goog.require('shaka.test.Waiter');
-goog.require('shaka.util.EventManager');
-goog.require('shaka.util.ManifestParserUtils');
-goog.require('shaka.util.Platform');
-goog.require('shaka.util.PlayerConfiguration');
-goog.require('shaka.util.PublicPromise');
-
 describe('DrmEngine', () => {
   const ContentType = shaka.util.ManifestParserUtils.ContentType;
 
@@ -224,10 +209,10 @@ describe('DrmEngine', () => {
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       await drmEngine.attach(video);
       await mediaSourceEngine.appendBuffer(
-          ContentType.VIDEO, videoInitSegment, null, null,
+          ContentType.VIDEO, videoInitSegment, null,
           /* hasClosedCaptions= */ false);
       await mediaSourceEngine.appendBuffer(
-          ContentType.AUDIO, audioInitSegment, null, null,
+          ContentType.AUDIO, audioInitSegment, null,
           /* hasClosedCaptions= */ false);
       await encryptedEventSeen;
       // With PlayReady, a persistent license policy can cause a different
@@ -260,17 +245,20 @@ describe('DrmEngine', () => {
         }
       }
 
+      const reference = dummyReference(0, 10);
+
       await mediaSourceEngine.appendBuffer(
-          ContentType.VIDEO, videoSegment, 0, 10,
+          ContentType.VIDEO, videoSegment, reference,
           /* hasClosedCaptions= */ false);
       await mediaSourceEngine.appendBuffer(
-          ContentType.AUDIO, audioSegment, 0, 10,
+          ContentType.AUDIO, audioSegment, reference,
           /* hasClosedCaptions= */ false);
 
       expect(video.buffered.end(0)).toBeGreaterThan(0);
       video.play();
 
       const waiter = new shaka.test.Waiter(eventManager).timeoutAfter(15);
+      waiter.setMediaSourceEngine(mediaSourceEngine);
       await waiter.waitForMovement(video);
 
       // Something should have played by now.
@@ -319,10 +307,10 @@ describe('DrmEngine', () => {
       await drmEngine.initForPlayback(variants, manifest.offlineSessionIds);
       await drmEngine.attach(video);
       await mediaSourceEngine.appendBuffer(
-          ContentType.VIDEO, videoInitSegment, null, null,
+          ContentType.VIDEO, videoInitSegment, null,
           /* hasClosedCaptions= */ false);
       await mediaSourceEngine.appendBuffer(
-          ContentType.AUDIO, audioInitSegment, null, null,
+          ContentType.AUDIO, audioInitSegment, null,
           /* hasClosedCaptions= */ false);
       await encryptedEventSeen;
 
@@ -340,17 +328,20 @@ describe('DrmEngine', () => {
         }
       }
 
+      const reference = dummyReference(0, 10);
+
       await mediaSourceEngine.appendBuffer(
-          ContentType.VIDEO, videoSegment, 0, 10,
+          ContentType.VIDEO, videoSegment, reference,
           /* hasClosedCaptions= */ false);
       await mediaSourceEngine.appendBuffer(
-          ContentType.AUDIO, audioSegment, 0, 10,
+          ContentType.AUDIO, audioSegment, reference,
           /* hasClosedCaptions= */ false);
 
       expect(video.buffered.end(0)).toBeGreaterThan(0);
       video.play();
 
       const waiter = new shaka.test.Waiter(eventManager).timeoutAfter(15);
+      waiter.setMediaSourceEngine(mediaSourceEngine);
       await waiter.waitForMovement(video);
 
       // Something should have played by now.
@@ -358,4 +349,16 @@ describe('DrmEngine', () => {
       expect(video.currentTime).toBeGreaterThan(0);
     });
   });  // describe('ClearKey')
+
+  function dummyReference(startTime, endTime) {
+    return new shaka.media.SegmentReference(
+        startTime, endTime,
+        /* uris= */ () => ['foo://bar'],
+        /* startByte= */ 0,
+        /* endByte= */ null,
+        /* initSegmentReference= */ null,
+        /* timestampOffset= */ 0,
+        /* appendWindowStart= */ 0,
+        /* appendWindowEnd= */ Infinity);
+  }
 });

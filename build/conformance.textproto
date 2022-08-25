@@ -320,3 +320,38 @@ requirement: {
     "instead."
   whitelist_regexp: "lib/net/http_fetch_plugin.js"
 }
+
+# Disallow the use of generators, which are a major performance issue.  See
+# https://github.com/shaka-project/shaka-player/issues/4062#issuecomment-1079428268
+requirement: {
+  type: BANNED_CODE_PATTERN
+  value:
+    "/** @param {*} x */ "
+    "function *template(x) { yield x; }"
+  error_message:
+    "ES6 generators are a major performance issue!  Find another solution. "
+    "See also https://bit.ly/3wAsoj5"
+  whitelist_regexp: "node_modules/"
+}
+
+# Disallow the general use of TextDecoder and TextEncoder, which is not
+# available on all supported platforms.
+requirement: {
+  type: BANNED_NAME_CALL
+  value: "TextDecoder"
+  value: "window.TextDecoder"
+  error_message:
+    "Using \"TextDecoder\" directly is not allowed; "
+    "because is not supported on Xbox and old browsers."
+  whitelist_regexp: "lib/util/string_utils.js"
+}
+
+requirement: {
+  type: BANNED_NAME_CALL
+  value: "TextEncoder"
+  value: "window.TextEncoder"
+  error_message:
+    "Using \"TextEncoder\" directly is not allowed; "
+    "because is not supported on Xbox and old browsers."
+  whitelist_regexp: "lib/util/string_utils.js"
+}

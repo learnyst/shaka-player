@@ -383,6 +383,10 @@
     "description": "The name of a configuration value.",
     "message": "Ignore [PROPER_NAME:DASH] [JARGON:suggestedPresentationDelay]"
   },
+  "DEMO_IGNORE_DEVICE_PIXEL_RATIO": {
+    "description": "The name of a configuration value.",
+    "message": "Ignore device pixel ratio"
+  },
   "DEMO_IGNORE_HLS_TEXT_FAILURES": {
     "description": "The name of a configuration value.",
     "message": "Ignore [PROPER_NAME:HLS] Text Stream Failures"
@@ -434,10 +438,6 @@
   "DEMO_JSDELIVR": {
     "description": "A link in the footer, to Shaka Player in the jsDelivr CDN.",
     "message": "[PROPER_NAME:jsDelivr]"
-  },
-  "DEMO_JUMP_LARGE_GAPS": {
-    "description": "The name of a configuration value.",
-    "message": "Jump Large Gaps"
   },
   "DEMO_LANGUAGE_SECTION_HEADER": {
     "description": "The header for a section of configuration values.",
@@ -539,6 +539,10 @@
     "description": "The name of a configuration value.",
     "message": "Max Bandwidth"
   },
+  "DEMO_MAX_DISABLED_TIME": {
+    "description": "The maximum amount of seconds a variant can be disabled when an error is thrown.",
+    "message": "Max Variant Disabled Time"
+  },
   "DEMO_MAX_FRAMERATE": {
     "description": "The name of a configuration value.",
     "message": "Max Framerate"
@@ -550,10 +554,6 @@
   "DEMO_MAX_PIXELS": {
     "description": "The name of a configuration value.",
     "message": "Max Pixels"
-  },
-  "DEMO_MAX_SMALL_GAP_SIZE": {
-    "description": "The name of a configuration value.",
-    "message": "Maximum Small Gap Size"
   },
   "DEMO_MAX_WIDTH": {
     "description": "The name of a configuration value.",
@@ -647,6 +647,10 @@
     "description": "A warning on number inputs, telling the user what the expected input format is.",
     "message": "Must be a positive, nonzero integer."
   },
+  "DEMO_NUMBER_OF_PARALLEL_DOWNLOADS": {
+    "description": "The name of a configuration value.",
+    "message": "Number of parallel downloads."
+  },
   "DEMO_OBSERVE_QUALITY_CHANGES": {
     "description": "The name of a configuration value.",
     "message": "Observe media quality changes"
@@ -711,6 +715,10 @@
     "description": "A link in the header, that files a bug report.",
     "message": "REPORT BUG"
   },
+  "DEMO_RESTRICT_TO_ELEMENT_SIZE": {
+    "description": "The name of a configuration value.",
+    "message": "Restrict to element size"
+  },
   "DEMO_RESTRICTIONS_SECTION_HEADER": {
     "description": "The header for a section of configuration values.",
     "message": "Restrictions"
@@ -726,6 +734,10 @@
   "DEMO_SAVE_BUTTON": {
     "description": "A button to save a custom asset.",
     "message": "Save"
+  },
+  "DEMO_SEGMENT_RELATIVE_VTT_TIMING": {
+    "description": "The name of a configuration value.",
+    "message": "Enable segment-relative VTT Timing"
   },
   "DEMO_SESSION_ID": {
     "description": "The name of a configuration value.",

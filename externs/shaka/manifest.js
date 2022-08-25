@@ -176,6 +176,7 @@ shaka.extern.DrmInfo;
  * @typedef {{
  *   id: number,
  *   language: string,
+ *   disabledUntilTime: number,
  *   primary: boolean,
  *   audio: ?shaka.extern.Stream,
  *   video: ?shaka.extern.Stream,
@@ -198,6 +199,12 @@ shaka.extern.DrmInfo;
  *   The Variant's language, specified as a language code. <br>
  *   See {@link https://tools.ietf.org/html/rfc5646} <br>
  *   See {@link http://www.iso.org/iso/home/standards/language_codes.htm}
+ * @property {number} disabledUntilTime
+ *   <i>Defaults to 0.</i> <br>
+ *   0 means the variant is enabled. The Player will set this value to
+ *   "(Date.now() / 1000) + config.streaming.maxDisabledTime" and once this
+ *   maxDisabledTime has passed Player will set the value to 0 in order to
+ *   reenable the variant.
  * @property {boolean} primary
  *   <i>Defaults to false.</i> <br>
  *   True indicates that the player should use this Variant over others if user
@@ -235,6 +242,49 @@ shaka.extern.Variant;
  * @exportDoc
  */
 shaka.extern.CreateSegmentIndexFunction;
+
+
+/**
+ * @typedef {{
+ *   method: string,
+ *   cryptoKey: (webCrypto.CryptoKey|undefined),
+ *   fetchKey: (shaka.extern.CreateSegmentIndexFunction|undefined),
+ *   iv: (!Uint8Array|undefined),
+ *   firstMediaSequenceNumber: number
+ * }}
+ *
+ * @description
+ * AES-128 key and iv info from the HLS manifest.
+ *
+ * @property {string} method
+ *   The key method defined in the HLS manifest.
+ * @property {webCrypto.CryptoKey|undefined} cryptoKey
+ *   Web crypto key object of the AES-128 CBC key. If unset, the "fetchKey"
+ *   property should be provided.
+ * @property {shaka.extern.FetchCryptoKeysFunction|undefined} fetchKey
+ *   A function that fetches the key.
+ *   Should be provided if the "cryptoKey" property is unset.
+ *   Should update this object in-place, to set "cryptoKey".
+ * @property {(!Uint8Array|undefined)} iv
+ *   The IV in the HLS manifest, if defined. See HLS RFC 8216 Section 5.2 for
+ *   handling undefined IV.
+ * @property {number} firstMediaSequenceNumber
+ *   The starting Media Sequence Number of the playlist, used when IV is
+ *   undefined.
+ *
+ * @exportDoc
+ */
+shaka.extern.HlsAes128Key;
+
+
+/**
+ * A function that fetches the crypto keys for AES-128.
+ * Returns a promise that resolves when the keys have been fetched.
+ *
+ * @typedef {function(): !Promise}
+ * @exportDoc
+ */
+shaka.extern.FetchCryptoKeysFunction;
 
 
 /**
