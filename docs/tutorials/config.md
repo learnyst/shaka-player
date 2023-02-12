@@ -64,6 +64,7 @@ player.getConfiguration();
      playRangeEnd: Infinity
      playRangeStart: 0
      preferredAudioLanguage: ""
+     preferredAudioLabel: ""
      preferredTextLanguage: ""
      restrictions: Object
      streaming: Object
@@ -77,6 +78,7 @@ player.getConfiguration();
        retryParameters: Object
        startAtSegmentBoundary: false
        safeSeekOffset: 5
+       segmentPrefetchLimit: 0
      textDisplayFactory: Function
 
 

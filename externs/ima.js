@@ -143,7 +143,7 @@ google.ima.AdsManagerLoadedEvent.Type = {
 
 /** @const */
 google.ima.AdEvent = class extends Event {
-  /** @return {!google.ima.Ad } */
+  /** @return {?google.ima.Ad} */
   getAd() {}
 };
 
@@ -167,6 +167,12 @@ google.ima.Ad = class {
 
   /** @return {boolean} */
   isLinear() {}
+
+  /** @return {string} */
+  getTitle() {}
+
+  /** @return {string} */
+  getDescription() {}
 };
 
 
@@ -389,6 +395,12 @@ google.ima.dai.api.Ad = class {
 
   /** @return {boolean} */
   isSkippable() {}
+
+  /** @return {string} */
+  getTitle() {}
+
+  /** @return {string} */
+  getDescription() {}
 };
 
 
@@ -499,6 +511,15 @@ google.ima.dai.api.StreamRequest.prototype.streamActivityMonitorId;
 
 /** @type {?string} */
 google.ima.dai.api.StreamRequest.prototype.format;
+
+
+/**
+ * @enum {string}
+ */
+google.ima.dai.api.StreamRequest.StreamFormat = {
+  DASH: 'dash',
+  HLS: 'hls',
+};
 
 
 /** @const */

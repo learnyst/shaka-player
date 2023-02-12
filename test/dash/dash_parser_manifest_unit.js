@@ -52,6 +52,8 @@ describe('DashParser Manifest', () => {
       isLowLatencyMode: () => false,
       isAutoLowLatencyMode: () => false,
       enableLowLatencyMode: () => {},
+      updateDuration: () => {},
+      newDrmInfo: (stream) => {},
     };
   });
 
@@ -118,7 +120,13 @@ describe('DashParser Manifest', () => {
     });
   }
 
-  describe('parses and inherits attributes', () => {
+  describe('parses and inherits attributes with sequenceMode', () => {
+    beforeEach(() => {
+      const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+      config.dash.sequenceMode = true;
+      parser.configure(config);
+    });
+
     makeTestsForEach(
         [
           '<MPD minBufferTime="PT75S">',
@@ -146,6 +154,8 @@ describe('DashParser Manifest', () => {
           '</MPD>',
         ],
         shaka.test.ManifestGenerator.generate((manifest) => {
+          manifest.sequenceMode = true;
+          manifest.type = shaka.media.ManifestParser.DASH;
           manifest.anyTimeline();
           manifest.minBufferTime = 75;
           manifest.addPartialVariant((variant) => {
@@ -194,40 +204,89 @@ describe('DashParser Manifest', () => {
         }));
   });
 
-  it('rejects periods after one without duration', async () => {
-    const periodContents = [
-      '    <AdaptationSet mimeType="video/mp4" lang="en" group="1">',
-      '      <Representation bandwidth="100">',
-      '        <SegmentTemplate startNumber="1" media="l-$Number$.mp4">',
-      '          <SegmentTimeline>',
-      '            <S t="0" d="10" />',
-      '          </SegmentTimeline>',
-      '        </SegmentTemplate>',
-      '      </Representation>',
-      '    </AdaptationSet>',
-    ].join('\n');
-    const template = [
-      '<MPD mediaPresentationDuration="PT75S">',
-      '  <Period id="1">',
-      '%(periodContents)s',
-      '  </Period>',
-      '  <Period id="2">',
-      '%(periodContents)s',
-      '  </Period>',
-      '</MPD>',
-    ].join('\n');
-    const source = sprintf(template, {periodContents: periodContents});
+  describe('parses and inherits attributes without sequenceMode', () => {
+    beforeEach(() => {
+      const config = shaka.util.PlayerConfiguration.createDefault().manifest;
+      config.dash.sequenceMode = false;
+      parser.configure(config);
+    });
 
-    fakeNetEngine.setResponseText('dummy://foo', source);
-    /** @type {shaka.extern.Manifest} */
-    const manifest = await parser.start('dummy://foo', playerInterface);
-    const video = manifest.variants[0].video;
-    await video.createSegmentIndex();
 
-    // The first period has a segment from 0-10.
-    // With the second period skipping, we should fail to find a segment at 10.
-    expect(video.segmentIndex.find(0)).not.toBe(null);
-    expect(video.segmentIndex.find(10)).toBe(null);
+    makeTestsForEach(
+        [
+          '<MPD minBufferTime="PT75S">',
+          '  <Period id="1" duration="PT30S">',
+          '    <BaseURL>http://example.com</BaseURL>',
+        ],
+        [
+          '    <AdaptationSet contentType="video" mimeType="video/mp4"',
+          '        codecs="avc1.4d401f" frameRate="1000000/42000">',
+          '      <Representation bandwidth="100" width="768" height="576" />',
+          '      <Representation bandwidth="50" width="576" height="432" />',
+          '    </AdaptationSet>',
+          '    <AdaptationSet mimeType="text/vtt"',
+          '        lang="es" label="spanish">',
+          '      <Role value="caption" />',
+          '      <Role value="main" />',
+          '      <Representation bandwidth="100" />',
+          '    </AdaptationSet>',
+          '    <AdaptationSet mimeType="audio/mp4" lang="en" ',
+          '                             codecs="mp4a.40.29">',
+          '      <Role value="main" />',
+          '      <Representation bandwidth="100" />',
+          '    </AdaptationSet>',
+          '  </Period>',
+          '</MPD>',
+        ],
+        shaka.test.ManifestGenerator.generate((manifest) => {
+          manifest.sequenceMode = false;
+          manifest.type = shaka.media.ManifestParser.DASH;
+          manifest.anyTimeline();
+          manifest.minBufferTime = 75;
+          manifest.addPartialVariant((variant) => {
+            variant.language = 'en';
+            variant.bandwidth = 200;
+            variant.primary = true;
+            variant.addPartialStream(ContentType.VIDEO, (stream) => {
+              stream.bandwidth = 100;
+              stream.frameRate = 1000000 / 42000;
+              stream.size(768, 576);
+              stream.mime('video/mp4', 'avc1.4d401f');
+            });
+            variant.addPartialStream(ContentType.AUDIO, (stream) => {
+              stream.bandwidth = 100;
+              stream.primary = true;
+              stream.roles = ['main'];
+              stream.mime('audio/mp4', 'mp4a.40.29');
+            });
+          });
+          manifest.addPartialVariant((variant) => {
+            variant.language = 'en';
+            variant.bandwidth = 150;
+            variant.primary = true;
+            variant.addPartialStream(ContentType.VIDEO, (stream) => {
+              stream.bandwidth = 50;
+              stream.frameRate = 1000000 / 42000;
+              stream.size(576, 432);
+              stream.mime('video/mp4', 'avc1.4d401f');
+            });
+            variant.addPartialStream(ContentType.AUDIO, (stream) => {
+              stream.bandwidth = 100;
+              stream.primary = true;
+              stream.roles = ['main'];
+              stream.mime('audio/mp4', 'mp4a.40.29');
+            });
+          });
+          manifest.addPartialTextStream((stream) => {
+            stream.language = 'es';
+            stream.label = 'spanish';
+            stream.primary = true;
+            stream.mimeType = 'text/vtt';
+            stream.bandwidth = 100;
+            stream.kind = 'caption';
+            stream.roles = ['caption', 'main'];
+          });
+        }));
   });
 
   it('calculates Period times when missing', async () => {
@@ -2105,6 +2164,7 @@ describe('DashParser Manifest', () => {
     /** @type {shaka.extern.Manifest} */
     const manifest = await parser.start('dummy://foo', playerInterface);
     expect(manifest.imageStreams.length).toBe(1);
+    expect(manifest.presentationTimeline.getMaxSegmentDuration()).toBe(1);
     const imageStream = manifest.imageStreams[0];
     expect(imageStream.width).toBe(1024);
     expect(imageStream.height).toBe(1152);

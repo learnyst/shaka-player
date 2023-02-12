@@ -123,6 +123,7 @@ describe('Player', () => {
       streamingEngine = new shaka.test.FakeStreamingEngine();
       mediaSourceEngine = {
         init: jasmine.createSpy('init').and.returnValue(Promise.resolve()),
+        configure: jasmine.createSpy('configure'),
         open: jasmine.createSpy('open').and.returnValue(Promise.resolve()),
         destroy:
             jasmine.createSpy('destroy').and.returnValue(Promise.resolve()),
@@ -130,6 +131,8 @@ describe('Player', () => {
         getUseEmbeddedText: jasmine.createSpy('getUseEmbeddedText'),
         setSegmentRelativeVttTiming:
             jasmine.createSpy('setSegmentRelativeVttTiming'),
+        updateLcevcDil:
+            jasmine.createSpy('updateLcevcDil'),
         getTextDisplayer: () => textDisplayer,
         getBufferedInfo: () => bufferedInfo,
         ended: jasmine.createSpy('ended').and.returnValue(false),
@@ -342,10 +345,18 @@ describe('Player', () => {
           shaka.util.Error.Severity.RECOVERABLE,
           shaka.util.Error.Category.NETWORK,
           shaka.util.Error.Code.HTTP_ERROR);
-      const nonHttpError = new shaka.util.Error(
+      const badHttpStatusError = new shaka.util.Error(
+          shaka.util.Error.Severity.RECOVERABLE,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.BAD_HTTP_STATUS);
+      const timeoutError = new shaka.util.Error(
           shaka.util.Error.Severity.RECOVERABLE,
           shaka.util.Error.Category.NETWORK,
           shaka.util.Error.Code.TIMEOUT);
+      const operationAbortedError = new shaka.util.Error(
+          shaka.util.Error.Severity.RECOVERABLE,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.OPERATION_ABORTED);
       /** @type {?jasmine.Spy} */
       let dispatchEventSpy;
 
@@ -368,9 +379,9 @@ describe('Player', () => {
         dispatchEventSpy.calls.reset();
       });
 
-      it('does not handle non NETWORK HTTP_ERROR', () => {
-        onErrorCallback(nonHttpError);
-        expect(nonHttpError.handled).toBeFalsy();
+      it('does not handle non recoverable network error', () => {
+        onErrorCallback(operationAbortedError);
+        expect(operationAbortedError.handled).toBeFalsy();
         expect(player.dispatchEvent).toHaveBeenCalled();
       });
 
@@ -435,6 +446,16 @@ describe('Player', () => {
           it('handles HTTP_ERROR', () => {
             onErrorCallback(httpError);
             expect(httpError.handled).toBeTruthy();
+          });
+
+          it('handles BAD_HTTP_STATUS', () => {
+            onErrorCallback(badHttpStatusError);
+            expect(badHttpStatusError.handled).toBeTruthy();
+          });
+
+          it('handles TIMEOUT', () => {
+            onErrorCallback(timeoutError);
+            expect(timeoutError.handled).toBeTruthy();
           });
 
           it('does not dispatch any error', () => {
@@ -626,13 +647,13 @@ describe('Player', () => {
       // Try a bogus streaming config (number instead of Object)
       logErrorSpy.calls.reset();
       player.configure({
-        streaming: 5,
+        drm: 5,
       });
 
       newConfig = player.getConfiguration();
       expect(newConfig).toEqual(defaultConfig);
       expect(logErrorSpy).toHaveBeenCalledWith(
-          stringContaining('.streaming'));
+          stringContaining('.drm'));
     });
 
     it('accepts synchronous function values for async function fields', () => {
@@ -1249,6 +1270,7 @@ describe('Player', () => {
         manifest.addVariant(106, (variant) => {  // spanish stereo, low res
           variant.language = 'es';
           variant.bandwidth = 1100;
+          variant.label = 'es-label';
           variant.addExistingStream(1);  // video
           variant.addAudio(6, (stream) => {
             stream.originalId = 'audio-es';
@@ -1260,6 +1282,7 @@ describe('Player', () => {
         manifest.addVariant(107, (variant) => {  // spanish stereo, high res
           variant.language = 'es';
           variant.bandwidth = 2100;
+          variant.label = 'es-label';
           variant.addExistingStream(2);  // video
           variant.addExistingStream(6);  // audio
         });
@@ -1526,7 +1549,7 @@ describe('Player', () => {
           type: 'variant',
           bandwidth: 1100,
           language: 'es',
-          label: null,
+          label: 'es-label',
           kind: null,
           width: 100,
           height: 200,
@@ -1562,7 +1585,7 @@ describe('Player', () => {
           type: 'variant',
           bandwidth: 2100,
           language: 'es',
-          label: null,
+          label: 'es-label',
           kind: null,
           width: 200,
           height: 400,
@@ -2232,6 +2255,18 @@ describe('Player', () => {
         language: 'en',
         roles: ['commentary'],
       }));
+    });
+
+    it('chooses a variant with preferred audio label', async () => {
+      expect(getActiveVariantTrack().label).toBe(null);
+
+      player.configure({
+        preferredAudioLanguage: '',
+        preferredAudioLabel: 'es-label',
+      });
+
+      await player.load(fakeManifestUri, 0, fakeMimeType);
+      expect(getActiveVariantTrack().label).toBe('es-label');
     });
   });  // describe('tracks')
 
@@ -3390,7 +3425,9 @@ describe('Player', () => {
           variant.addAudio(0, (stream) => {
             stream.channelsCount = 6;
             stream.audioSamplingRate = 48000;
-            stream.codecs = 'ac-3';
+            // ac-3 is rewritten as ec-3 on Tizen, so for the stability of this
+            // test case, use ec-3.
+            stream.codecs = 'ec-3';
           });
         });
 
@@ -3415,7 +3452,7 @@ describe('Player', () => {
       expect(abrManager.variants.length).toBe(1);
       // It should be the 6-channel variant, based on our preference.
       expect(abrManager.variants[0].audio.channelsCount).toBe(6);
-      expect(abrManager.variants[0].audio.codecs).toBe('ac-3');
+      expect(abrManager.variants[0].audio.codecs).toBe('ec-3');
     });
   });
 
@@ -3937,6 +3974,93 @@ describe('Player', () => {
       expect(variant.audio.segmentIndex.getIteratorForTime(0)).toBeNull();
 
       await player.load(fakeManifestUri, 0, fakeMimeType);
+    });
+  });
+
+  describe('config streaming.failureCallback default', () => {
+    /** @type {jasmine.Spy} */
+    let retryStreaming;
+    /** @type {jasmine.Spy} */
+    let isLive;
+
+    /**
+     * @suppress {accessControls}
+     * @param {!shaka.util.Error} error
+     */
+    function defaultStreamingFailureCallback(error) {
+      player.defaultStreamingFailureCallback_(error);
+    }
+
+    beforeEach(() => {
+      retryStreaming = jasmine.createSpy('retryStreaming');
+      isLive = jasmine.createSpy('isLive');
+
+      player.retryStreaming = Util.spyFunc(retryStreaming);
+      player.isLive = Util.spyFunc(isLive);
+    });
+
+    it('ignores VOD failures', () => {
+      isLive.and.returnValue(false);
+
+      const error = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.BAD_HTTP_STATUS,
+          /* url= */ '',
+          /* http_status= */ 404);
+
+      defaultStreamingFailureCallback(error);
+      expect(retryStreaming).not.toHaveBeenCalled();
+    });
+
+    it('retries live on HTTP 404', () => {
+      isLive.and.returnValue(true);
+
+      const error = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.BAD_HTTP_STATUS,
+          /* url= */ '',
+          /* http_status= */ 404);
+
+      defaultStreamingFailureCallback(error);
+      expect(retryStreaming).toHaveBeenCalled();
+    });
+
+    it('retries live on generic HTTP error', () => {
+      isLive.and.returnValue(true);
+
+      const error = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.HTTP_ERROR);
+
+      defaultStreamingFailureCallback(error);
+      expect(retryStreaming).toHaveBeenCalled();
+    });
+
+    it('retries live on HTTP timeout', () => {
+      isLive.and.returnValue(true);
+
+      const error = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.NETWORK,
+          shaka.util.Error.Code.TIMEOUT);
+
+      defaultStreamingFailureCallback(error);
+      expect(retryStreaming).toHaveBeenCalled();
+    });
+
+    it('ignores other live failures', () => {
+      isLive.and.returnValue(true);
+
+      const error = new shaka.util.Error(
+          shaka.util.Error.Severity.CRITICAL,
+          shaka.util.Error.Category.MEDIA,
+          shaka.util.Error.Code.VIDEO_ERROR);
+
+      defaultStreamingFailureCallback(error);
+      expect(retryStreaming).not.toHaveBeenCalled();
     });
   });
 

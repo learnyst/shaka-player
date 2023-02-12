@@ -207,6 +207,25 @@ describe('SegmentIndex', /** @suppress {accessControls} */ () => {
       ];
       expect(index.references).toEqual(newReferences);
     });
+
+    it('preserves hls key of the last reference', () => {
+      // The hls key of the last segment should be preserved.
+      const references = [
+        makeReference(uri(0), 0, 5, [],
+            {method: 'AES-128', firstMediaSequenceNumber: 0}),
+        makeReference(uri(1), 5, 10, [],
+            {method: 'AES-128', firstMediaSequenceNumber: 0}),
+        makeReference(uri(2), 10, 15, [],
+            {method: 'AES-128', firstMediaSequenceNumber: 0}),
+      ];
+      const index = new shaka.media.SegmentIndex(references);
+      expect(index.references).toEqual(references);
+
+      index.fit(/* windowStart= */ 0, /* windowEnd= */ 10);
+      expect(
+          index.references[index.references.length - 1].hlsAes128Key,
+      ).toEqual({method: 'AES-128', firstMediaSequenceNumber: 0});
+    });
   });
 
   describe('merge', () => {
@@ -512,6 +531,34 @@ describe('SegmentIndex', /** @suppress {accessControls} */ () => {
       expect(index1.find(10)).toBe(position1);
       goog.asserts.assert(position1 != null, 'Position should not be null!');
       expect(index1.get(position1)).toBe(references2[1]);
+    });
+
+    it('does not duplicate references with rounding errors', () => {
+      /** @type {!Array.<!shaka.media.SegmentReference>} */
+      const references1 = [
+        makeReference(uri(10), 10, 20),
+        makeReference(uri(20), 20, 30),
+      ];
+      const index1 = new shaka.media.SegmentIndex(references1);
+
+      // 0.24 microseconds: an insignificant rounding error.
+      const tinyError = 0.24e-6;
+
+      /** @type {!Array.<!shaka.media.SegmentReference>} */
+      const references2 = [
+        makeReference(uri(10), 10, 20),
+        // The difference between this and the equivalent old reference is an
+        // insignificant rounding error.
+        makeReference(uri(20), 20 + tinyError, 30 + tinyError),
+        makeReference(uri(30), 30 + tinyError, 40),
+      ];
+
+      index1.merge(references2);
+      expect(index1.references.length).toBe(3);
+      expect(index1.references[0]).toEqual(references1[0]);
+      // The new references replaced the old one.
+      expect(index1.references[1]).toEqual(references2[1]);
+      expect(index1.references[2]).toEqual(references2[2]);
     });
   });
 
@@ -955,9 +1002,11 @@ describe('SegmentIndex', /** @suppress {accessControls} */ () => {
    * @param {number} startTime
    * @param {number} endTime
    * @param {!Array.<!shaka.media.SegmentReference>=} partialReferences
+   * @param {?shaka.extern.HlsAes128Key=} hlsAes128Key
    * @return {shaka.media.SegmentReference}
    */
-  function makeReference(uri, startTime, endTime, partialReferences = []) {
+  function makeReference(uri, startTime, endTime, partialReferences = [],
+      hlsAes128Key = null) {
     return new shaka.media.SegmentReference(
         startTime,
         endTime,
@@ -968,6 +1017,11 @@ describe('SegmentIndex', /** @suppress {accessControls} */ () => {
         /* timestampOffset= */ 0,
         /* appendWindowStart= */ 0,
         /* appendWindowEnd= */ Infinity,
-        /* partialReferences= */ partialReferences);
+        /* partialReferences= */ partialReferences,
+        /* tilesLayout= */ undefined,
+        /* tileDuration= */ undefined,
+        /* syncTime= */ undefined,
+        /* status= */ undefined,
+        /* hlsAes128Key= */ hlsAes128Key);
   }
 });

@@ -92,10 +92,12 @@ shakaDemo.Config = class {
     this.addOfflineSection_();
     this.addDrmSection_();
     this.addStreamingSection_();
+    this.addMediaSourceSection_();
     this.addManifestSection_();
     this.addRetrictionsSection_('',
         shakaDemo.MessageIds.RESTRICTIONS_SECTION_HEADER);
     this.addCmcdSection_();
+    this.addLcevcSection_();
   }
 
   /**
@@ -131,7 +133,11 @@ shakaDemo.Config = class {
             'drm.updateExpirationTime',
             /* canBeDecimal= */ true,
             /* canBeZero= */ false,
-            /* canBeUnset= */ true);
+            /* canBeUnset= */ true)
+        .addBoolInput_(MessageIds.PARSE_INBAND_PSSH_ENABLED,
+            'drm.parseInbandPsshEnabled')
+        .addTextInput_(MessageIds.MIN_HDCP_VERSION,
+            'drm.minHdcpVersion');
     const advanced = shakaDemoMain.getConfiguration().drm.advanced || {};
     const addDRMAdvancedField = (name, valueName, suggestions) => {
       // All advanced fields of a given type are set at once.
@@ -214,6 +220,12 @@ shakaDemo.Config = class {
             'manifest.hls.defaultVideoCodec')
         .addBoolInput_(MessageIds.IGNORE_MANIFEST_PROGRAM_DATE_TIME,
             'manifest.hls.ignoreManifestProgramDateTime')
+        .addBoolInput_(MessageIds.USE_SAFARI_BEHAVIOR_FOR_LIVE,
+            'manifest.hls.useSafariBehaviorForLive')
+        .addNumberInput_(MessageIds.LIVE_SEGMENTS_DELAY,
+            'manifest.hls.liveSegmentsDelay')
+        .addBoolInput_(MessageIds.HLS_SEQUENCE_MODE,
+            'manifest.hls.sequenceMode')
         .addNumberInput_(MessageIds.AVAILABILITY_WINDOW_OVERRIDE,
             'manifest.availabilityWindowOverride',
             /* canBeDecimal= */ true,
@@ -229,6 +241,8 @@ shakaDemo.Config = class {
             /* canBeDecimal= */ false,
             /* canBeZero= */ false,
             /* canBeUnset= */ true)
+        .addBoolInput_(MessageIds.DASH_SEQUENCE_MODE,
+            'manifest.dash.sequenceMode')
         .addBoolInput_(MessageIds.DISABLE_AUDIO,
             'manifest.disableAudio')
         .addBoolInput_(MessageIds.DISABLE_VIDEO,
@@ -274,6 +288,8 @@ shakaDemo.Config = class {
             /* canBeDecimal= */ true)
         .addBoolInput_(MessageIds.RESTRICT_TO_ELEMENT_SIZE,
             'abr.restrictToElementSize')
+        .addBoolInput_(MessageIds.RESTRICT_TO_SCREEN_SIZE,
+            'abr.restrictToScreenSize')
         .addBoolInput_(MessageIds.IGNORE_DEVICE_PIXEL_RATIO,
             'abr.ignoreDevicePixelRatio');
     this.addRetrictionsSection_('abr',
@@ -289,6 +305,18 @@ shakaDemo.Config = class {
         .addTextInput_(MessageIds.SESSION_ID, 'cmcd.sessionId')
         .addTextInput_(MessageIds.CONTENT_ID, 'cmcd.contentId')
         .addBoolInput_(MessageIds.USE_HEADERS, 'cmcd.useHeaders');
+  }
+
+  /** @private */
+  addLcevcSection_() {
+    const MessageIds = shakaDemo.MessageIds;
+    const docLink = this.resolveExternLink_('.LcevcConfiguration');
+    this.addSection_(MessageIds.LCEVC_SECTION_HEADER, docLink)
+        .addBoolInput_(MessageIds.ENABLED, 'lcevc.enabled')
+        .addBoolInput_(MessageIds.LCEVC_DYNAMIC_PERFORMANCE_SCALING,
+            'lcevc.dynamicPerformanceScaling')
+        .addNumberInput_(MessageIds.LCEVC_LOG_LEVEL, 'lcevc.logLevel')
+        .addBoolInput_(MessageIds.LCEVC_DRAW_LOGO, 'lcevc.drawLogo');
   }
 
   /**
@@ -398,7 +426,9 @@ shakaDemo.Config = class {
         .addBoolInput_(MessageIds.OBSERVE_QUALITY_CHANGES,
             'streaming.observeQualityChanges')
         .addNumberInput_(MessageIds.MAX_DISABLED_TIME,
-            'streaming.maxDisabledTime');
+            'streaming.maxDisabledTime')
+        .addNumberInput_(MessageIds.SEGMENT_PREFETCH_LIMIT,
+            'streaming.segmentPrefetchLimit');
 
     if (!shakaDemoMain.getNativeControlsEnabled()) {
       this.addBoolInput_(MessageIds.ALWAYS_STREAM_TEXT,
@@ -412,10 +442,8 @@ shakaDemo.Config = class {
       this.latestInput_.input().checked = true;
     }
 
-    this.addBoolInput_(MessageIds.FORCE_TRANSMUX_TS,
-        'streaming.forceTransmuxTS')
-        .addBoolInput_(MessageIds.START_AT_SEGMENT_BOUNDARY,
-            'streaming.startAtSegmentBoundary')
+    this.addBoolInput_(MessageIds.START_AT_SEGMENT_BOUNDARY,
+        'streaming.startAtSegmentBoundary')
         .addBoolInput_(MessageIds.IGNORE_TEXT_FAILURES,
             'streaming.ignoreTextStreamFailures')
         .addBoolInput_(MessageIds.STALL_DETECTOR_ENABLED,
@@ -427,13 +455,42 @@ shakaDemo.Config = class {
   }
 
   /** @private */
+  addMediaSourceSection_() {
+    const MessageIds = shakaDemo.MessageIds;
+    const docLink = this.resolveExternLink_('.MediaSourceConfiguration');
+    this.addSection_(MessageIds.MEDIA_SOURCE_SECTION_HEADER, docLink)
+        .addTextInput_(MessageIds.SOURCE_BUFFER_EXTRA_FEATURES,
+            'mediaSource.sourceBufferExtraFeatures')
+        .addBoolInput_(MessageIds.FORCE_TRANSMUX,
+            'mediaSource.forceTransmux');
+  }
+
+  /** @private */
   addLanguageSection_() {
     const MessageIds = shakaDemo.MessageIds;
     const docLink = this.resolveExternLink_('.PlayerConfiguration');
+
+    const autoShowTextOptions = shaka.config.AutoShowText;
+    const localize = (name) => shakaDemoMain.getLocalizedString(name);
+    const autoShowTextOptionNames = {
+      'NEVER': localize(MessageIds.AUTO_SHOW_TEXT_NEVER),
+      'ALWAYS': localize(MessageIds.AUTO_SHOW_TEXT_ALWAYS),
+      'IF_PREFERRED_TEXT_LANGUAGE':
+          localize(MessageIds.AUTO_SHOW_TEXT_IF_PREFERRED_TEXT_LANGUAGE),
+      'IF_SUBTITLES_MAY_BE_NEEDED':
+          localize(MessageIds.AUTO_SHOW_TEXT_IF_SUBTITLES_MAY_BE_NEEDED),
+    };
+
     this.addSection_(MessageIds.LANGUAGE_SECTION_HEADER, docLink)
         .addTextInput_(MessageIds.AUDIO_LANGUAGE, 'preferredAudioLanguage')
+        .addTextInput_(MessageIds.AUDIO_LABEL, 'preferredAudioLabel')
         .addTextInput_(MessageIds.TEXT_LANGUAGE, 'preferredTextLanguage')
-        .addTextInput_(MessageIds.TEXT_ROLE, 'preferredTextRole');
+        .addTextInput_(MessageIds.TEXT_ROLE, 'preferredTextRole')
+        .addSelectInput_(
+            MessageIds.AUTO_SHOW_TEXT,
+            'autoShowText',
+            autoShowTextOptions,
+            autoShowTextOptionNames);
     const onChange = (input) => {
       shakaDemoMain.setUILocale(input.value);
       shakaDemoMain.remakeHash();
@@ -523,7 +580,7 @@ shakaDemo.Config = class {
       }
       shakaDemoMain.remakeHash();
     };
-    this.addSelectInput_(MessageIds.LOG_LEVEL, logLevels, onChange);
+    this.addCustomSelectInput_(MessageIds.LOG_LEVEL, logLevels, onChange);
     const input = this.latestInput_.input();
     switch (shaka['log']['currentLevel']) {
       case Level['DEBUG']:
@@ -705,12 +762,48 @@ shakaDemo.Config = class {
    * @return {!shakaDemo.Config}
    * @private
    */
-  addSelectInput_(name, values, onChange, tooltipMessage) {
+  addCustomSelectInput_(name, values, onChange, tooltipMessage) {
     this.createRow_(name, tooltipMessage);
     // The input is not provided a name, as (in this enclosed space) it makes
     // the actual field unreadable.
     this.latestInput_ = new shakaDemo.SelectInput(
         this.getLatestSection_(), null, onChange, values);
+    return this;
+  }
+
+  /**
+   * @param {!shakaDemo.MessageIds} name
+   * @param {string} valueName
+   * @param {!Object.<string, ?>} options
+   * @param {!Object.<string, string>} optionNames
+   * @param {shakaDemo.MessageIds=} tooltipMessage
+   * @return {!shakaDemo.Config}
+   * @private
+   */
+  addSelectInput_(name, valueName, options, optionNames, tooltipMessage) {
+    const onChange = (input) => {
+      shakaDemoMain.configure(valueName, options[input.value]);
+      shakaDemoMain.remakeHash();
+    };
+
+    // If there are any translations missing for option names, fill in the
+    // constant from the enum.  This ensures new enum values are usable in the
+    // demo in some form, even if they are forgotten in the demo config.
+    for (const key in options) {
+      if (!(key in optionNames)) {
+        optionNames[key] = key;
+      }
+    }
+
+    this.addCustomSelectInput_(name, optionNames, onChange, tooltipMessage);
+
+    const initialValue = shakaDemoMain.getCurrentConfigValue(valueName);
+    for (const key in options) {
+      if (options[key] == initialValue) {
+        this.latestInput_.input().value = key;
+      }
+    }
+
     return this;
   }
 

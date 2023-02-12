@@ -26,7 +26,8 @@ let MockTimeRanges;
  *   timestampOffset: number,
  *   appendWindowEnd: number,
  *   updateend: function(),
- *   error: function()
+ *   error: function(),
+ *   mode: string
  * }}
  */
 let MockSourceBuffer;
@@ -41,7 +42,13 @@ describe('MediaSourceEngine', () => {
   const originalCreateMediaSource =
       // eslint-disable-next-line no-restricted-syntax
       shaka.media.MediaSourceEngine.prototype.createMediaSource;
-  const originalTransmuxer = shaka.media.Transmuxer;
+
+  const originalFindTransmuxer =
+      shaka.transmuxer.TransmuxerEngine.findTransmuxer;
+  const originalConvertCodecs =
+      shaka.transmuxer.TransmuxerEngine.convertCodecs;
+  const originalIsSupported =
+      shaka.transmuxer.TransmuxerEngine.isSupported;
 
   // Jasmine Spies don't handle toHaveBeenCalledWith well with objects, so use
   // some numbers instead.
@@ -57,6 +64,7 @@ describe('MediaSourceEngine', () => {
   let audioSourceBuffer;
   let videoSourceBuffer;
   let mockVideo;
+
   /** @type {HTMLMediaElement} */
   let video;
   let mockMediaSource;
@@ -87,7 +95,12 @@ describe('MediaSourceEngine', () => {
 
   afterAll(() => {
     window.MediaSource.isTypeSupported = originalIsTypeSupported;
-    shaka.media.Transmuxer = originalTransmuxer;
+    shaka.transmuxer.TransmuxerEngine.findTransmuxer =
+        originalFindTransmuxer;
+    shaka.transmuxer.TransmuxerEngine.convertCodecs =
+        originalConvertCodecs;
+    shaka.transmuxer.TransmuxerEngine.isSupported =
+        originalIsSupported;
   });
 
   beforeEach(/** @suppress {invalidCasts} */ () => {
@@ -99,15 +112,18 @@ describe('MediaSourceEngine', () => {
       return type == 'audio' ? audioSourceBuffer : videoSourceBuffer;
     });
     mockTransmuxer = new shaka.test.FakeTransmuxer();
-
-    // eslint-disable-next-line no-restricted-syntax
-    shaka.media.Transmuxer = /** @type {?} */ (function() {
-      return /** @type {?} */ (mockTransmuxer);
-    });
-    shaka.media.Transmuxer.convertTsCodecs = originalTransmuxer.convertTsCodecs;
-    shaka.media.Transmuxer.isSupported = (mimeType, contentType) => {
-      return mimeType == 'tsMimetype';
-    };
+    shaka.transmuxer.TransmuxerEngine.findTransmuxer =
+        (mimeType) => {
+          return () => mockTransmuxer;
+        };
+    shaka.transmuxer.TransmuxerEngine.convertCodecs =
+        (mimeType, contentType) => {
+          return 'video/mp4; codecs="avc1.42E01E"';
+        };
+    shaka.transmuxer.TransmuxerEngine.isSupported =
+        (mimeType, contentType) => {
+          return mimeType == 'tsMimetype';
+        };
 
     shaka.text.TextEngine = createMockTextEngineCtor();
 
@@ -148,8 +164,12 @@ describe('MediaSourceEngine', () => {
     mockTextDisplayer = new shaka.test.FakeTextDisplayer();
     mediaSourceEngine = new shaka.media.MediaSourceEngine(
         video,
-        mockClosedCaptionParser,
         mockTextDisplayer);
+    mediaSourceEngine.getCaptionParser = () => {
+      return mockClosedCaptionParser;
+    };
+    const config = shaka.util.PlayerConfiguration.createDefault().mediaSource;
+    mediaSourceEngine.configure(config);
   });
 
   afterEach(() => {
@@ -202,7 +222,6 @@ describe('MediaSourceEngine', () => {
     it('creates a MediaSource object and sets video.src', () => {
       mediaSourceEngine = new shaka.media.MediaSourceEngine(
           video,
-          new shaka.test.FakeClosedCaptionParser(),
           new shaka.test.FakeTextDisplayer());
 
       expect(createMediaSourceSpy).toHaveBeenCalled();
@@ -355,12 +374,13 @@ describe('MediaSourceEngine', () => {
 
     it('rejects promise when operation throws', async () => {
       audioSourceBuffer.appendBuffer.and.throwError('fail!');
-      mockVideo.error = {code: 5};
+      mockVideo.error = {code: 5, message: 'something failed'};
       const expected = Util.jasmineError(new shaka.util.Error(
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.MEDIA,
           shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW,
-          jasmine.objectContaining({message: 'fail!'})));
+          jasmine.objectContaining({message: 'fail!'}),
+          {code: 5, message: 'something failed'}));
       await expectAsync(
           mediaSourceEngine.appendBuffer(
               ContentType.AUDIO, buffer, null,
@@ -526,7 +546,7 @@ describe('MediaSourceEngine', () => {
           data, 0, 10);
     });
 
-    it('appends transmuxed data and captions', async () => {
+    it('appends transmuxed data', async () => {
       const initObject = new Map();
       initObject.set(ContentType.VIDEO, fakeTransportStream);
 
@@ -541,40 +561,7 @@ describe('MediaSourceEngine', () => {
         await mediaSourceEngine.appendBuffer(
             ContentType.VIDEO, buffer, null,
             /* hasClosedCaptions= */ false);
-        expect(mockTextEngine.storeAndAppendClosedCaptions).toHaveBeenCalled();
         expect(videoSourceBuffer.appendBuffer).toHaveBeenCalled();
-      };
-
-      // The 'updateend' event fires once the data is done appending to the
-      // media source.  We only append to the media source once transmuxing is
-      // done.  Since transmuxing is done using Promises, we need to delay the
-      // event until MediaSourceEngine calls appendBuffer.
-      const delay = async () => {
-        await Util.shortDelay();
-        videoSourceBuffer.updateend();
-      };
-      await Promise.all([init(), delay()]);
-    });
-
-    it('appends only transmuxed data without embedded text', async () => {
-      const initObject = new Map();
-      initObject.set(ContentType.VIDEO, fakeTransportStream);
-
-      const output = {
-        data: new Uint8Array(1),
-        captions: [],
-      };
-      mockTransmuxer.transmux.and.returnValue(Promise.resolve(output));
-
-      const init = async () => {
-        await mediaSourceEngine.init(initObject, false);
-        await mediaSourceEngine.appendBuffer(
-            ContentType.VIDEO, buffer, null,
-            /* hasClosedCaptions= */ false);
-        expect(mockTextEngine.storeAndAppendClosedCaptions)
-            .not.toHaveBeenCalled();
-        expect(videoSourceBuffer.appendBuffer)
-            .toHaveBeenCalledWith(output.data);
       };
 
       // The 'updateend' event fires once the data is done appending to the
@@ -622,6 +609,81 @@ describe('MediaSourceEngine', () => {
 
       expect(mockTextEngine.storeAndAppendClosedCaptions).toHaveBeenCalled();
     });
+
+    it('sets timestampOffset on adaptations in sequence mode', async () => {
+      const initObject = new Map();
+      initObject.set(ContentType.VIDEO, fakeVideoStream);
+      videoSourceBuffer.mode = 'sequence';
+
+      await mediaSourceEngine.init(initObject, /* sequenceMode= */ true);
+
+      expect(videoSourceBuffer.timestampOffset).toBe(0);
+
+      // Mocks appending a segment from a newly adapted variant with a 0.50
+      // second misalignment from the old variant.
+      const reference = dummyReference(0, 1000);
+      reference.startTime = 0.50;
+      const appendVideo = mediaSourceEngine.appendBuffer(
+          ContentType.VIDEO, buffer, reference, /* hasClosedCaptions= */ false,
+          /* seeked= */ false, /* adaptation= */ true);
+      videoSourceBuffer.updateend();
+      await appendVideo;
+
+      expect(videoSourceBuffer.timestampOffset).toBe(0.50);
+    });
+
+    it('calls abort before setting timestampOffset', async () => {
+      const simulateUpdate = async () => {
+        await Util.shortDelay();
+        videoSourceBuffer.updateend();
+      };
+      const initObject = new Map();
+      initObject.set(ContentType.VIDEO, fakeVideoStream);
+
+      await mediaSourceEngine.init(initObject, /* sequenceMode= */ true);
+
+      // First, mock the scenario where timestampOffset is set to help align
+      // text segments. In this case, SourceBuffer mode is still 'segments'.
+      let reference = dummyReference(0, 1000);
+      let appendVideo = mediaSourceEngine.appendBuffer(
+          ContentType.VIDEO, buffer, reference, /* hasClosedCaptions= */ false);
+      // Wait for the first appendBuffer(), in segments mode.
+      await simulateUpdate();
+      // Next, wait for abort(), used to reset the parser state for a safe
+      // setting of timestampOffset. Shaka fakes an updateend event on abort(),
+      // so simulateUpdate() isn't needed.
+      await Util.shortDelay();
+      // Next, wait for remove(), used to clear the SourceBuffer from the
+      // initial append.
+      await simulateUpdate();
+      // Next, wait for the second appendBuffer(), falling through to normal
+      // operations.
+      await simulateUpdate();
+      // Lastly, wait for the function-scoped MediaSourceEngine#appendBuffer()
+      // promise to resolve.
+      await appendVideo;
+      expect(videoSourceBuffer.abort).toHaveBeenCalledTimes(1);
+
+      // Second, mock the scenario where timestampOffset is set during an
+      // unbuffered seek or adaptation. SourceBuffer mode is 'sequence' now.
+      reference = dummyReference(0, 1000);
+      appendVideo = mediaSourceEngine.appendBuffer(
+          ContentType.VIDEO, buffer, reference, /* hasClosedCaptions= */ false,
+          /* seeked= */ true);
+      // First, wait for abort(), used to reset the parser state for a safe
+      // setting of timestampOffset.
+      await Util.shortDelay();
+      // The subsequent setTimestampOffset() fakes an updateend event for us, so
+      // simulateUpdate() isn't needed.
+      await Util.shortDelay();
+      // Next, wait for the second appendBuffer(), falling through to normal
+      // operations.
+      await simulateUpdate();
+      // Lastly, wait for the function-scoped MediaSourceEngine#appendBuffer()
+      // promise to resolve.
+      await appendVideo;
+      expect(videoSourceBuffer.abort).toHaveBeenCalledTimes(2);
+    });
   });
 
   describe('remove', () => {
@@ -651,7 +713,8 @@ describe('MediaSourceEngine', () => {
           shaka.util.Error.Severity.CRITICAL,
           shaka.util.Error.Category.MEDIA,
           shaka.util.Error.Code.MEDIA_SOURCE_OPERATION_THREW,
-          jasmine.objectContaining({message: 'fail!'})));
+          jasmine.objectContaining({message: 'fail!'}),
+          {code: 5}));
       await expectAsync(mediaSourceEngine.remove(ContentType.AUDIO, 1, 5))
           .toBeRejectedWith(expected);
       expect(audioSourceBuffer.remove).toHaveBeenCalledWith(1, 5);
@@ -1003,6 +1066,43 @@ describe('MediaSourceEngine', () => {
       expect(audioSourceBuffer.appendBuffer).toHaveBeenCalledWith(buffer);
       audioSourceBuffer.updateend();
     });
+
+    it('allows duration to be shrunk', async () => {
+      // Pretend the initial duration was 100.
+      mockMediaSource.durationGetter.and.returnValue(100);
+
+      // When duration is shrunk, 'updateend' events are generated.  This is
+      // because reducing the duration triggers the MSE removal algorithm to
+      // run.
+      mockMediaSource.durationSetter.and.callFake((duration) => {
+        expect(duration).toBe(50);
+        videoSourceBuffer.updateend();
+        audioSourceBuffer.updateend();
+      });
+
+      audioSourceBuffer.appendBuffer.and.callFake(() => {
+        audioSourceBuffer.updateend();
+      });
+      videoSourceBuffer.appendBuffer.and.callFake(() => {
+        videoSourceBuffer.updateend();
+      });
+
+      /** @type {!Promise} */
+      const p1 = mediaSourceEngine.setDuration(50);
+      expect(mockMediaSource.durationSetter).not.toHaveBeenCalled();
+
+      // These operations should be blocked until after duration is shrunk.
+      // This is tested because shrinking duration generates 'updateend'
+      // events, and we want to show that the queue still operates correctly.
+      const a1 = mediaSourceEngine.appendBuffer(ContentType.AUDIO, buffer, null,
+          /* hasClosedCaptions= */ false);
+      const a2 = mediaSourceEngine.appendBuffer(ContentType.VIDEO, buffer, null,
+          /* hasClosedCaptions= */ false);
+
+      await p1;
+      await a1;
+      await a2;
+    });
   });
 
   describe('destroy', () => {
@@ -1160,6 +1260,7 @@ describe('MediaSourceEngine', () => {
       appendWindowEnd: Infinity,
       updateend: () => {},
       error: () => {},
+      mode: 'segments',
     };
   }
 
@@ -1176,7 +1277,7 @@ describe('MediaSourceEngine', () => {
       mockTextEngine = jasmine.createSpyObj('TextEngine', [
         'initParser', 'destroy', 'appendBuffer', 'remove', 'setTimestampOffset',
         'setAppendWindow', 'bufferStart', 'bufferEnd', 'bufferedAheadOf',
-        'storeAndAppendClosedCaptions', 'convertMuxjsCaptionsToShakaCaptions',
+        'storeAndAppendClosedCaptions',
       ]);
 
       const resolve = () => Promise.resolve();

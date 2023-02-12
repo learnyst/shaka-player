@@ -340,6 +340,9 @@ shaka.test.FakePlayhead = class {
     this.stallsDetected_ = 0;
 
     /** @type {!jasmine.Spy} */
+    this.ready = jasmine.createSpy('ready');
+
+    /** @type {!jasmine.Spy} */
     this.setStartTime = jasmine.createSpy('setStartTime')
         .and.callFake((value) => {
           this.startTime_ = value;
@@ -494,20 +497,33 @@ shaka.test.FakeSegmentIndex = class {
   }
 };
 
-/** @extends {shaka.media.Transmuxer} */
+/** @implements {shaka.extern.Transmuxer} */
 shaka.test.FakeTransmuxer = class {
   constructor() {
+    const mp4MimeType = 'video/mp4; codecs="avc1.42E01E"';
+
     const output = {
       data: new Uint8Array(),
       captions: [],
     };
 
     /** @type {!jasmine.Spy} */
-    this.destroy =
-        jasmine.createSpy('destroy').and.returnValue(Promise.resolve());
+    this.destroy = jasmine.createSpy('destroy');
+
+    /** @type {!jasmine.Spy} */
+    this.isSupported =
+        jasmine.createSpy('isSupported').and.returnValue(true);
+
+    /** @type {!jasmine.Spy} */
+    this.convertCodecs =
+        jasmine.createSpy('convertCodecs').and.returnValue(mp4MimeType);
 
     /** @type {!jasmine.Spy} */
     this.transmux =
         jasmine.createSpy('transmux').and.returnValue(Promise.resolve(output));
+
+    /** @type {!jasmine.Spy} */
+    this.getOrginalMimeType =
+        jasmine.createSpy('getOrginalMimeType').and.returnValue('mimeType');
   }
 };

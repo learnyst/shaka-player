@@ -8,6 +8,13 @@ Modern EME yet, you can use legacy Apple Media Keys with:
 shaka.polyfill.PatchedMediaKeysApple.install();
 ```
 
+If you need to use both legacy and Modern EME, for example if you have to support
+multiple DRM providers, it is possible to enable uninstalling the polyfill:
+```js
+shaka.polyfill.PatchedMediaKeysApple.install(/* enableUninstall= */ true);
+shaka.polyfill.PatchedMediaKeysApple.uninstall();
+```
+
 The support in each case would be the following:
 
 |            |Modern EME |legacy Apple Media Keys|
@@ -209,4 +216,19 @@ player.getNetworkingEngine()
     .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
 player.configure('drm.initDataTransform',
                  FairPlayUtils.conaxInitDataTransform);
+```
+
+#### ExpressPlay (legacy Apple Media Keys)
+
+For integration with ExpressPlay the following can be used:
+
+```js
+shaka.polyfill.PatchedMediaKeysApple.install();
+const FairPlayUtils = shaka.util.FairPlayUtils;
+player.getNetworkingEngine()
+    .registerRequestFilter(FairPlayUtils.expressplayFairPlayRequest);
+player.getNetworkingEngine()
+    .registerResponseFilter(FairPlayUtils.commonFairPlayResponse);
+player.configure('drm.initDataTransform',
+                 FairPlayUtils.expressplayInitDataTransform);
 ```

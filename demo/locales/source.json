@@ -47,6 +47,10 @@
     "description": "The name of a configuration value.",
     "message": "Preferred Audio Language"
   },
+  "DEMO_AUDIO_LABEL": {
+    "description": "The name of a configuration value.",
+    "message": "Preferred Audio Label"
+  },
   "DEMO_AUDIO_ONLY": {
     "description": "A tag that marks an asset as having multiple languages.",
     "message": "Audio only"
@@ -66,6 +70,26 @@
   "DEMO_AUTO_LOW_LATENCY": {
     "description": "The name of a configuration value.",
     "message": "Auto Low Latency Streaming"
+  },
+  "DEMO_AUTO_SHOW_TEXT": {
+    "description": "The name of a configuration value.",
+    "message": "Auto-Show Text"
+  },
+  "DEMO_AUTO_SHOW_TEXT_NEVER": {
+    "description": "The name of a configuration value.",
+    "message": "Never"
+  },
+  "DEMO_AUTO_SHOW_TEXT_ALWAYS": {
+    "description": "The name of a configuration value.",
+    "message": "Always"
+  },
+  "DEMO_AUTO_SHOW_TEXT_IF_PREFERRED_TEXT_LANGUAGE": {
+    "description": "The name of a configuration value.",
+    "message": "If preferred text language"
+  },
+  "DEMO_AUTO_SHOW_TEXT_IF_SUBTITLES_MAY_BE_NEEDED": {
+    "description": "The name of a configuration value.",
+    "message": "If subtitles may be needed"
   },
   "DEMO_AVAILABILITY_WINDOW_OVERRIDE": {
     "description": "The name of a configuration value.",
@@ -195,6 +219,10 @@
     "description": "Text that describes an asset that comes from the Dash Industry Forum asset library.",
     "message": "[PROPER_NAME:DASH-IF]"
   },
+  "DEMO_DASH_SEQUENCE_MODE": {
+    "description": "The name of a configuration value.",
+    "message": "Enable DASH sequence mode"
+  },
   "DEMO_DEFAULT_AUDIO_CODEC": {
     "description": "The name of a configuration value.",
     "message": "Default Audio Codec"
@@ -311,9 +339,9 @@
     "description": "The name of a configuration value.",
     "message": "Force [JARGON:HTTPS]"
   },
-  "DEMO_FORCE_TRANSMUX_TS": {
+  "DEMO_FORCE_TRANSMUX": {
     "description": "The name of a configuration value.",
-    "message": "Force Transmux [JARGON:MPEG-2 TS]"
+    "message": "Force Transmux"
   },
   "DEMO_FRONT_INTRO_DISMISS": {
     "description": "A button allowing users to dismiss the intro message.",
@@ -354,6 +382,10 @@
   "DEMO_HLS": {
     "description": "Text that describes an asset that is packaged in an HLS manifest.",
     "message": "[PROPER_NAME:HLS]"
+  },
+  "DEMO_HLS_SEQUENCE_MODE": {
+    "description": "The name of a configuration value.",
+    "message": "Enable HLS sequence mode"
   },
   "DEMO_HLS_TAB": {
     "description": "The header for a tab within the custom asset creation dialog.",
@@ -403,6 +435,10 @@
     "description": "The label on a field that allows users to provide a content source id for a custom asset.",
     "message": "Asset key (for VOD DAI Content)"
   },
+  "DEMO_IMA_MANIFEST_TYPE": {
+    "description": "The label on a field that allows users to provide a manifest type for a custom asset.",
+    "message": "Manifest type (for DAI Content)"
+  },
   "DEMO_IMA_VIDEO_ID": {
     "description": "The label on a field that allows users to provide a video id for a custom asset.",
     "message": "Video ID (for VOD DAI Content)"
@@ -443,6 +479,26 @@
     "description": "The header for a section of configuration values.",
     "message": "Language"
   },
+  "DEMO_LCEVC": {
+    "description": "Text that describes an asset that has LCEVC.",
+    "message": "[PROPER_NAME:LCEVC]"
+  },
+  "DEMO_LCEVC_DRAW_LOGO": {
+    "description": "LCEVC Watermark on the top left hand corner of the canvas.",
+    "message": "Draw [PROPER_NAME:LCEVC] Logo"
+  },
+  "DEMO_LCEVC_DYNAMIC_PERFORMANCE_SCALING": {
+    "description": "Dynamic Performance scaling for enabling/disabling LCEVC decoding based on decode performance.",
+    "message": "[PROPER_NAME:LCEVC] [JARGON:Dynamic Performance scaling]"
+  },
+  "DEMO_LCEVC_LOG_LEVEL": {
+    "description": "Log Level for LCEVC Lib (0-5)",
+    "message": "[PROPER_NAME:LCEVC] Log Level"
+  },
+  "DEMO_LCEVC_SECTION_HEADER": {
+    "description": "The header for a section of configuration values.",
+    "message": "[PROPER_NAME:MPEG-5 Part-2 LCEVC]"
+  },
   "DEMO_LIBRARIES": {
     "description": "A link in the footer, to Shaka Player in the Google Hosted Libraries CDN.",
     "message": "[PROPER_NAME:Google Hosted Libraries]"
@@ -478,6 +534,10 @@
   "DEMO_LIVE_SEARCH": {
     "description": "A header on a search field that filters by whether the asset is live or not.",
     "message": "Live"
+  },
+  "DEMO_LIVE_SEGMENTS_DELAY": {
+    "description": "The name of a configuration value.",
+    "message": "Live segments delay"
   },
   "DEMO_LOG_LEVEL": {
     "description": "The name of a configuration value.",
@@ -559,6 +619,10 @@
     "description": "The name of a configuration value.",
     "message": "Max Width"
   },
+  "DEMO_MEDIA_SOURCE_SECTION_HEADER": {
+    "description": "The header for a section of configuration values.",
+    "message": "Media source"
+  },
   "DEMO_METACDN": {
     "description": "Text that describes an asset that comes from the MetaCDN asset library.",
     "message": "[PROPER_NAME:MetaCDN]"
@@ -578,6 +642,10 @@
   "DEMO_MIN_BYTES": {
     "description": "The name of a configuration value.",
     "message": "Min Bytes"
+  },
+  "DEMO_MIN_HDCP_VERSION": {
+    "description": "The name of a configuration value.",
+    "message": "Min HDCP version"
   },
   "DEMO_MIN_FRAMERATE": {
     "description": "The name of a configuration value.",
@@ -679,6 +747,10 @@
     "description": "The label on a field that allows users to provide a full mime type for a custom asset.",
     "message": "Full Mime Type for Playing Media Playlists Directly"
   },
+  "DEMO_PARSE_INBAND_PSSH_ENABLED": {
+    "description": "The name of a configuration value.",
+    "message": "Parse inband 'pssh' from media segments"
+  },
   "DEMO_PLAY": {
     "description": "A button to play the attached asset.",
     "message": "Play"
@@ -719,6 +791,10 @@
     "description": "The name of a configuration value.",
     "message": "Restrict to element size"
   },
+  "DEMO_RESTRICT_TO_SCREEN_SIZE": {
+    "description": "The name of a configuration value.",
+    "message": "Restrict to screen size"
+  },
   "DEMO_RESTRICTIONS_SECTION_HEADER": {
     "description": "The header for a section of configuration values.",
     "message": "Restrictions"
@@ -758,6 +834,10 @@
   "DEMO_SOURCE": {
     "description": "A link in the footer, to the Shaka Player source on GitHub.",
     "message": "Source on [PROPER_NAME:GitHub]"
+  },
+  "DEMO_SOURCE_BUFFER_EXTRA_FEATURES": {
+    "description": "The name of a configuration value.",
+    "message": "Source buffer extra features"
   },
   "DEMO_SOURCE_SEARCH": {
     "description": "A header on a search field that filters by the source of the asset.",
@@ -927,6 +1007,10 @@
     "description": "The name of a configuration value.",
     "message": "Use Persistent Licenses"
   },
+  "DEMO_USE_SAFARI_BEHAVIOR_FOR_LIVE": {
+    "description": "The name of a configuration value.",
+    "message": "Use Safari behavior for live"
+  },
   "DEMO_VIDEO_ROBUSTNESS": {
     "description": "The name of a configuration value.",
     "message": "Video Robustness"
@@ -942,6 +1026,10 @@
   "DEMO_VISUALIZER_SCREENSHOT_BUTTON": {
     "description": "A button that takes a screenshot of the current visualizer state.",
     "message": "Take Screenshot"
+  },
+  "DEMO_VNOVA": {
+    "description": "Text that describes an asset that comes from V-Nova.",
+    "message": "[PROPER_NAME:V-Nova]"
   },
   "DEMO_VOD": {
     "description": "Text that describes an asset that is a VOD (Video On Delivery).",
@@ -966,5 +1054,9 @@
   "DEMO_XLINK_SEARCH": {
     "description": "A tooltip for an optional search term.",
     "message": "Filters for assets that have [JARGON:XLINK] tags in their manifests, so that they can be broken into multiple files."
+  },
+  "DEMO_SEGMENT_PREFETCH_LIMIT": {
+    "description": "Max number of segments to be prefetched ahead of current time position.",
+    "message": "Segment Prefetch Limit."
   }
 }

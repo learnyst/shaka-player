@@ -587,45 +587,59 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
     return false;
   }
 
-  /** @export */
-  async toggleFullScreen() {
-    if (document.fullscreenEnabled) {
-      if (document.fullscreenElement) {
-        if (screen.orientation) {
-          screen.orientation.unlock();
+  /** @private */
+  async enterFullScreen_() {
+    try {
+      if (document.fullscreenEnabled) {
+        if (document.pictureInPictureElement) {
+          await document.exitPictureInPicture();
         }
-        await document.exitFullscreen();
+        const fullScreenElement = this.config_.fullScreenElement;
+        await fullScreenElement.requestFullscreen({navigationUI: 'hide'});
+
+        if (this.config_.forceLandscapeOnFullscreen && screen.orientation) {
+          // Locking to 'landscape' should let it be either
+          // 'landscape-primary' or 'landscape-secondary' as appropriate.
+          // We ignore errors from this specific call, since it creates noise
+          // on desktop otherwise.
+          try {
+            await screen.orientation.lock('landscape');
+          } catch (error) {}
+        }
       } else {
-        // If we are in PiP mode, leave PiP mode first.
-        try {
-          if (document.pictureInPictureElement) {
-            await document.exitPictureInPicture();
-          }
-          await this.videoContainer_.requestFullscreen({navigationUI: 'hide'});
-          if (this.config_.forceLandscapeOnFullscreen && screen.orientation) {
-            try {
-              // Locking to 'landscape' should let it be either
-              // 'landscape-primary' or 'landscape-secondary' as appropriate.
-              await screen.orientation.lock('landscape');
-            } catch (error) {
-              // If screen.orientation.lock does not work on a device, it will
-              // be rejected with an error. Suppress that error.
-            }
-          }
-        } catch (error) {
-          this.dispatchEvent(new shaka.util.FakeEvent(
-              'error', (new Map()).set('detail', error)));
-        }
-      }
-    } else {
-      const video = /** @type {HTMLVideoElement} */(this.localVideo_);
-      if (video.webkitSupportsFullscreen) {
-        if (video.webkitDisplayingFullscreen) {
-          video.webkitExitFullscreen();
-        } else {
+        const video = /** @type {HTMLVideoElement} */(this.localVideo_);
+        if (video.webkitSupportsFullscreen) {
           video.webkitEnterFullscreen();
         }
       }
+    } catch (error) {
+      // Entering fullscreen can fail without user interaction.
+      this.dispatchEvent(new shaka.util.FakeEvent(
+          'error', (new Map()).set('detail', error)));
+    }
+  }
+
+  /** @private */
+  async exitFullScreen_() {
+    if (document.fullscreenEnabled) {
+      if (screen.orientation) {
+        screen.orientation.unlock();
+      }
+      await document.exitFullscreen();
+    } else {
+      const video = /** @type {HTMLVideoElement} */(this.localVideo_);
+      if (video.webkitSupportsFullscreen) {
+        video.webkitExitFullscreen();
+      }
+    }
+  }
+
+  /** @export */
+  async toggleFullScreen() {
+    if (this.isFullScreenEnabled()) {
+      await this.exitFullScreen_();
+    } else {
+      await this.enterFullScreen_();
     }
   }
 
@@ -1011,13 +1025,6 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
         await this.onScreenRotation_();
       });
     }
-
-    this.eventManager_.listen(document, 'fullscreenchange', () => {
-      if (this.ad_) {
-        this.ad_.resize(
-            this.localVideo_.offsetWidth, this.localVideo_.offsetHeight);
-      }
-    });
   }
 
 
@@ -1031,14 +1038,17 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
     if (!this.video_ ||
         this.video_.readyState == 0 ||
         this.castProxy_.isCasting() ||
-        !this.config_.enableFullscreenOnRotation) { return; }
+        !this.config_.enableFullscreenOnRotation ||
+        !this.isFullScreenSupported()) {
+      return;
+    }
 
     if (screen.orientation.type.includes('landscape') &&
-        !document.fullscreenElement) {
-      await this.videoContainer_.requestFullscreen({navigationUI: 'hide'});
+        !this.isFullScreenEnabled()) {
+      await this.enterFullScreen_();
     } else if (screen.orientation.type.includes('portrait') &&
-        document.fullscreenElement) {
-      await document.exitFullscreen();
+      this.isFullScreenEnabled()) {
+      await this.exitFullScreen_();
     }
   }
 
@@ -1196,7 +1206,7 @@ shaka.ui.Controls = class extends shaka.util.FakeEventTarget {
       // The controls are hidden, so show them.
       this.onMouseMove_(event);
       // Stop this event from becoming a click event.
-      event.preventDefault();
+      event.cancelable && event.preventDefault();
     }
   }
 

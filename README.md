@@ -135,14 +135,28 @@ HLS features supported:
  - CEA-608/708 captions
  - Encrypted content with PlayReady and Widevine
  - Encrypted content with FairPlay (Safari on macOS and iOS 13+ only)
+ - Key rotation
  - Raw AAC, MP3, etc (without an MP4 container)
 
 HLS features **not** supported:
- - Key rotation: https://github.com/shaka-project/shaka-player/issues/917
  - I-frame-only playlists: https://github.com/shaka-project/shaka-player/issues/742
  - Low-latency streaming with blocking playlist reload
 
 [mux.js]: https://github.com/videojs/mux.js/releases
+
+## MPEG-5 Part2 LCEVC Support
+
+**Only supported on browsers with Media Source Extensions SourceBuffer support**
+
+ - MPEG-5 Part2 LCEVC decoding support (decoding provided by [lcevc_dil.js][], must be
+   separately included)
+
+ - Integration documentation : [docs](docs/design/lcevc-integration.md)
+
+ - More on [MPEG-5 Part2 LCEVC][]
+
+[lcevc_dil.js]: https://www.npmjs.com/package/lcevc_dil.js
+[MPEG-5 Part2 LCEVC]: https://www.lcevc.org
 
 
 ## DRM support matrix
@@ -211,11 +225,9 @@ Shaka Player supports:
   - TTML
     - Supported in both XML form and embedded in MP4
   - CEA-608
-    - Supported embedded in MP4
-    - With help from [mux.js][] v6.2.0+, supported embedded in TS
+    - Supported embedded in MP4 and TS
   - CEA-708
-    - Supported embedded in MP4
-    - With help from [mux.js][] v6.2.0+, supported embedded in TS
+    - Supported embedded in MP4 and TS
   - SubRip (SRT)
     - UTF-8 encoding only
   - LyRiCs (LRC)
