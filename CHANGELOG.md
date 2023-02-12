@@ -1,6 +1,6 @@
 # Changelog
 
-## [4.3.1000](https://github.com/shaka-project/shaka-player/compare/v4.2.0...v4.3.0) (2022-11-10)
+## [4.3.1001](https://github.com/shaka-project/shaka-player/compare/v4.2.0...v4.3.0) (2022-11-10)
 
 
 ### Features
