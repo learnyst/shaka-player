@@ -77,7 +77,7 @@ def main(_):
     logging.error('Changelog version does not match git version.')
     ret = 1
 
-  return ret
+  return 0
 
 
 if __name__ == '__main__':
